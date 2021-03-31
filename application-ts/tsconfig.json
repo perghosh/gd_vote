@@ -1,0 +1,13 @@
+{
+   "compileOnSave": true,
+   "compilerOptions": {
+      "module": "ESNext",
+      "target": "ESNext",
+      "lib": [ "ES6", "DOM", "ESNext" ],
+      "outDir": "../application/"
+   },
+   "exclude": [
+      // "node_modules"
+   ]
+
+}

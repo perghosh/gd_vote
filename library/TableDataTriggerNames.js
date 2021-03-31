@@ -1,0 +1,36 @@
+import { CTableDataTrigger } from "./TableDataTrigger.js";
+export function SetTriggerName() {
+    let aTrigger = [
+        [1 /* BeforeCreate_ */, "BeforeCreate"],
+        [2 /* AfterCreate_ */, "AfterCreate"],
+        [3 /* BeforeDestroy_ */, "BeforeDestroy"],
+        [4 /* AfterDestroy_ */, "AfterDestroy"],
+        [5 /* BeforeLoadNew_ */, "BeforeLoadNew"],
+        [6 /* AfterLoadNew_ */, "AfterLoadNew"],
+        [7 /* BeforeLoad_ */, "BeforeLoad"],
+        [8 /* AfterLoad_ */, "AfterLoad"],
+        [9 /* BeforeValidateValue_ */, "BeforeValidateValue"],
+        [10 /* BeforeSetValue_ */, "BeforeSetValue"],
+        [11 /* AfterSetValue_ */, "AfterSetValue"],
+        [12 /* BeforeSelect_ */, "BeforeSelect"],
+        [13 /* AfterSelect_ */, "AfterSelect"],
+        [14 /* BeforeSetRange_ */, "BeforeSetRange"],
+        [15 /* AfterSetRange_ */, "AfterSetRange"],
+        [16 /* BeforeSetRow_ */, "BeforeSetRow"],
+        [17 /* AfterSetRow_ */, "AfterSetRow"],
+        [18 /* BeforeSetSort_ */, "BeforeSetSort"],
+        [19 /* AfterSetSort_ */, "AfterSetSort"],
+        [20 /* BeforeRemoveRow_ */, "BeforeRemoveRow"],
+        [21 /* AfterRemoveRow_ */, "AfterRemoveRow"],
+        [22 /* BeforeSetCellError_ */, "BeforeSetCellError"],
+        [23 /* AfterSetCellError_ */, "AfterSetCellError"],
+        [25 /* OnResize_ */, "OnResize"],
+        [26 /* UpdateDataNew */, "UpdateDataNew"],
+        [27 /* UpdateData */, "UpdateData"],
+        [28 /* UpdateRowNew */, "UpdateRowNew"],
+        [29 /* UpdateRowDelete */, "UpdateRowDelete"],
+        [30 /* UpdateRow */, "UpdateRow"],
+        [31 /* UpdateCell */, "UpdateCell"],
+    ];
+    CTableDataTrigger.SetTriggerName(aTrigger);
+}

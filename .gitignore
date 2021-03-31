@@ -1,0 +1,6 @@
+*.pdf
+*.map
+*.sublime*
+.vs/
+obj/
+

@@ -1,0 +1,376 @@
+﻿<!DOCTYPE html>
+<!--
+# Navigate in page:
+
+   QUERYGetLogin - query to get login information
+   QUERYGetPollList - query to get list of active polls
+   QUERYGetPollOverview - query to get poll information like name and number of questions
+   QUERYGetPollQuestions - Get questions for selected poll.
+   QUERYGetNextQuestion - Get next question for current poll
+
+   RESULTCreateLogin - Create login section from login query
+   RESULTCreatePollList - Create drop-down list with active polls that voter are able to select. 
+   RESULTShowPollOverview - Create header for selected poll
+   RESULTCreateQuestionPanel - Creates markup for selected poll, this is one or more questions with answers
+   RESULTCreateVote - Creates markup for possible answers to poll question
+   RESULTCreateVoteCount - Create markup showing vote count on each answer for poll question
+
+   ReadColumnInformationFromHeader
+
+   CApplication::Initialize - Initialize objects in CApplication for use.
+   CApplication::CreateLogin - Create login markup from source
+
+   ## Id to important elements
+   idTopSection - login and filter section
+   idPollList - List with active polls
+   idPollOverview - Main information about selected poll
+   idPollQuestionList - In this section users can vote in selected poll
+
+-->
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<body>
+
+   <!--
+
+   <label class="vote-check" data-style="rounded" data-color="green">
+      <input checked type="checkbox" value="1">
+      <span class="toggle">
+         <span class="switch"></span>
+      </span>
+   </label>
+   -->
+
+
+   <div class="container">
+
+      <div id="idError" class="has-background-danger-dark has-text-danger-light"></div>
+
+<!--
+div[data-section="container"]
+   div[data-section="tab"]
+      [data-tab="1"]
+      [data-tab="2"]
+   div[data-section="content"]
+      [data-content="1"]
+      [data-content="2"]
+-->
+      <div data-section="container">
+         <div data-section="tab" class="tabs is-small" style="height: 5em;">
+            <ul>
+               <li data-index="1" class="is-active" style="margin-top: auto;"><a data-translate="page.vote.TitleLogin">Inloggning</a></li>
+               <li data-index="2" style="margin-top: auto;"><a data-translate="page.vote.TitleSearchHash">Hashtagsök</a></li>
+               <li data-index="3" style="margin-top: auto;"><a data-translate="page.vote.TitleSearchField">Fältsök</a></li>
+               <li data-index="4" style="margin-top: auto;"><a data-translate="page.vote.TitleSearchArea">Geografisök</a></li>
+               <li data-index="5"  style="margin-top: auto;"><a data-translate="page.vote.TitleSearchPersonal">Mina intressen</a></li>
+               <li style="margin-left: auto;"><img src="res/logo_s.png" alt="Logo" /></li>
+            </ul>
+         </div>
+
+         <div data-section="content">
+            <article class="is-active notification is-primary" data-index="1" data-state="head.login">
+               <div id="idTopSection" class="content is-primary"></div>
+            </article>
+            <article class="notification is-primary" data-index="2" data-state="head.hash">
+            </article>
+            <article class="notification is-primary" data-index="3" data-state="head.field">
+            </article>
+            <article class="notification is-primary" data-index="4" data-state="head.area">
+            </article>
+            <article class="notification is-primary" data-index="5" data-state="head.personal">
+            </article>
+         </div>
+      </div>
+
+      <div class="notification is-primary">
+         <div class="content is-primary">
+            <span id="idPollList" class="select is-rounded">
+            </span>
+            <span class="is-size-4 is-pulled-right is-hidden-mobile">Välj omröstning i listan</span>
+         </div>
+      </div>
+
+<!--
+div[data-section="container"]
+   div[data-section="tab"]
+      [data-index="1"]
+      [data-index="2"]
+   div[data-section="content"]
+      [data-index="1"]
+      [data-index="2"]
+-->
+      <div data-section="container">
+         <div data-section="tab" class="tabs is-small" style="height: 5em;">
+            <ul>
+               <li class="is-active" data-index="1"><a data-translate="page.vote.vote">Rösta</a></li>
+               <li data-index="2"><a data-translate="page.vote.result">Resultat</a></li>
+            </ul>
+         </div>
+         <div id="idPollOverview" class="box has-background-success-light">
+            <h1 class="title is-2" data-title></h1>
+            <p class="is-5" data-description></p>
+         </div>
+
+         <div id="idContent" data-section="content">
+            <article id="idPollVote" class="box is-active" data-index="1" data-state="body.vote">
+            </article>
+            <article id="idPollCount" class="box" data-index="2" data-state="body.count">
+               <div>delete this</div
+            </article>
+         </div>
+      </div>
+   </div>
+
+
+   <script>
+      function PAGE_Setup() {
+
+
+         window.app = new CApplication();
+         window.app.Initialize();
+      }
+
+      /*
+       * ## Configure tabs. When user clicks on tab it should be activated and content is shown. 
+       * - Send notification to pagen when tabs is activated.
+       */
+      const aTabs = document.querySelectorAll(".tabs");
+      aTabs.forEach(eTabs => {
+         eTabs.addEventListener("click", e => {
+            let iTabIndex;
+            let eTab = e.srcElement;
+            let eContent = eTab.closest('[data-section="container"]').querySelector('[data-section="content"]'); // get content container, content holds information related to tab
+            if( eContent === null ) return;
+            if(eTab.tagName === "A" || eTab.tagName === "LI") { // found tab ?
+               let eHeader = eTab.closest(".tabs");
+               eHeader.querySelectorAll(".is-active").forEach(e => { e.classList.remove("is-active"); }); // remove all active tabs
+
+               // Set active tab
+               if(eTab.tagName !== "LI") eTab = eTab.closest("li"); // go to LI Element
+               eTab.classList.add("is-active" );
+               iTabIndex = parseInt( eTab.dataset.index, 10 );
+            }
+                                                                               console.assert( typeof iTabIndex === "number", "no number for page index, something is wrong in markup" );
+            
+            eContent.querySelectorAll(".is-active").forEach(e => { e.classList.remove("is-active"); }); // close all content pages
+
+            // Open content page for tab
+            eContent = eContent.querySelector(`[data-index="${iTabIndex}"]`);
+            eContent.classList.add("is-active");
+
+            const oPage = window.app.page;
+            oPage.SetActiveState( eContent.dataset.state, eContent );
+            if( oPage.GetActivePoll() > 0 ) oPage.SetActivePoll( oPage.GetActivePoll() );
+         });
+
+      });
+
+
+   </script>
+
+
+
+   <!--
+    | Load needed components to manage login and vote data
+   -->
+   <script type="module">
+      // #region LOAD_PAGE_COMPONENETS
+
+
+      import { CTableData, browser } from "./library/TableData.js";
+      import { edit } from "./library/TableDataEdit.js";
+      import { CTableDataTrigger } from "./library/TableDataTrigger.js";
+      import { SetTriggerName } from "./library/TableDataTriggerNames.js";
+      import { CUITableText } from "./library/UITableText.js";
+
+      import { CRequest } from "./server/ServerRequest.js";
+      import { CQuery } from "./server/Query.js";
+
+      import { CApplication } from "./application/application.js";
+      import { CPage } from "./application/page.js";
+
+
+      window.edit = edit;
+      window.CTableData = CTableData;
+      window.CTableData_browser = browser;
+      window.CUITableText = CUITableText;
+      window.CTableDataTrigger = CTableDataTrigger;
+
+      window.CApplication = CApplication;
+      window.CPage = CPage;
+
+      SetTriggerName();
+
+      window.CRequest = CRequest;
+      window.CQuery = CQuery;
+
+      window.onerror = function(sMessage, sUrl, iLine) {
+         if(typeof sMessage === "string") {
+            sMessage += "\n" + sUrl + "\nLine: " + iLine;
+            document.getElementById("idError").innerText = sMessage;
+         }
+      };
+
+
+      document.addEventListener('DOMContentLoaded', function() {
+         //PAGE_SetupEventList();
+         //PAGE_ServerSetup();
+         PAGE_Setup();
+      });
+
+
+      var aLogon = [
+         [ "Namn", "E-Mejl", "Lösenord" ],
+         [ "?", "?", "?" ]
+      ];
+// #endregion
+   </script>
+
+
+</body>
+<head>
+   <meta charset="utf-8" />
+   <title>Vote</title>
+   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.1/css/bulma.min.css">
+   <style>
+      :root {
+         --gd-blue: #0d6efd;
+         --gd-indigo: #6610f2;
+         --gd-purple: #6f42c1;
+         --gd-pink: #d63384;
+         --gd-red: #dc3545;
+         --gd-orange: #fd7e14;
+         --gd-yellow: #ffc107;
+         --gd-green: #198754;
+         --gd-teal: #20c997;
+         --gd-cyan: #0dcaf0;
+         --gd-white: #fff;
+         --gd-gray: #6c757d;
+         --gd-gray-dark: #343a40;
+         --gd-gray-light: #e9e8eb;
+         --gd-primary: #0d6efd;
+         --gd-secondary: #6c757d;
+         --gd-success: #198754;
+         --gd-info: #0dcaf0;
+         --gd-warning: #ffc107;
+         --gd-danger: #dc3545;
+         --gd-light: #f8f9fa;
+         --gd-dark: #212529;
+         --gd-font-sans-serif: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+         --gd-font-monospace: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      }
+
+
+      body {
+         color: #212529;
+         margin: 0;
+         font-family: var(--gd-font-sans-serif);
+         font-size: 1rem;
+         font-weight: 400;
+         line-height: 1.5;
+         background-color: #fff;
+      }
+
+      section, tbody {
+         outline: none;
+      }
+
+      .selected {
+         background-color: var(--gd-gray-light);
+      }
+
+      .checked {
+         display: inline-block;
+         width: 16px;
+         height: 16px;
+         background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-check2-square' viewBox='0 0 16 16'> <path d='M3 14.5A1.5 1.5 0 0 1 1.5 13V3A1.5 1.5 0 0 1 3 1.5h8a.5.5 0 0 1 0 1H3a.5.5 0 0 0-.5.5v10a.5.5 0 0 0 .5.5h10a.5.5 0 0 0 .5-.5V8a.5.5 0 0 1 1 0v5a1.5 1.5 0 0 1-1.5 1.5H3z'/> <path d='M8.354 10.354l7-7a.5.5 0 0 0-.708-.708L8 9.293 5.354 6.646a.5.5 0 1 0-.708.708l3 3a.5.5 0 0 0 .708 0z'/> </svg>");
+      }
+
+      /* CSS to show or hide tabs and its content */
+      div[data-section="content"] article {
+         display: none;
+      }
+
+      div[data-section="content"] article.is-active {
+         display: block;
+      }
+
+
+      /* Customizable styles  https://github.com/adamculpepper/toggle-switchy*/
+
+/* Colors: Default (blue) */
+.vote-check {color:#fff;}
+.vote-check > input + .toggle:before {content:'RÖST';}
+.vote-check > input + .toggle:after {content:'-';}
+.vote-check > input + .toggle > .switch {background:#fff;}
+.vote-check > input + .toggle + .label {color:#000;}
+.vote-check > input:checked + .toggle {background:#3498db;}
+.vote-check > input:not(:checked) + .toggle {background:#ccc;}
+.vote-check > input:checked + .toggle > .switch {border:3px solid #3498db;}
+.vote-check > input:not(:checked) + .toggle > .switch {border:3px solid #ccc;}
+.vote-check > input:focus + .toggle,
+.vote-check > input:active + .toggle {box-shadow:0 0 5px 3px rgba(0, 119, 200, 0.50);}
+
+/* Rounded switch corners */
+.vote-check > input + .toggle {border-radius:4px;}
+.vote-check > input + .toggle .switch {border-radius:6px;}
+
+/* //////////////////////////
+CORE STYLES BELOW - NO TOUCHY
+////////////////////////// */
+.vote-check {display:inline-flex; align-items:center; user-select:none; position:relative; vertical-align:middle; margin-bottom:0;}
+.vote-check:hover {cursor:pointer;}
+.vote-check > input {position:absolute; opacity:0;}
+.vote-check > input + .toggle {align-items:center; position:relative;}
+.vote-check > input + .toggle {overflow:hidden; position:relative; flex-shrink:0;}
+.vote-check > input[disabled] + .toggle {opacity:0.5;}
+.vote-check > input[disabled] + .toggle:hover {cursor:not-allowed;}
+.vote-check > input + .toggle {width:100%; height:100%; margin:0; cursor:pointer;}
+.vote-check > input + .toggle > .switch {display:block; height:100%; position:absolute; right:0; z-index:3; box-sizing:border-box;}
+
+/* Labels */
+.vote-check > input + .toggle:before,
+.vote-check > input + .toggle:after {display:flex; align-items:center; position:absolute; z-index:2; height:100%;}
+.vote-check > input + .toggle:before {right:55%;}
+.vote-check > input + .toggle:after {left:50%;}
+.vote-check > input + .toggle + .label {margin-left:10px;}
+.vote-check[data-label='left'] > input + .toggle {order:2;}
+.vote-check[data-label='left'] > input + .toggle + .label {order:1; margin-left:0; margin-right:10px;}
+
+/* Show / Hide */
+.vote-check > input + .toggle:before {opacity:0;}
+.vote-check > input:checked + .toggle:before {opacity:1;}
+.vote-check > input:checked + .toggle:after {opacity:0;}
+
+/* Transitions */
+.vote-check > input + .toggle {transition:background 200ms linear, box-shadow 200ms linear;}
+.vote-check > input + .toggle:before,
+.vote-check > input + .toggle:after {transition:all 200ms linear;}
+.vote-check > input + .toggle > .switch {transition:right 200ms linear, border-color 200ms linear;}
+
+
+/* Rounded switch corners */
+.vote-check > input + .toggle {border-radius:4px;}
+.vote-check > input + .toggle .switch {border-radius:6px;}
+
+/* Size: Large */
+.vote-check[data-size='lg'] > input + .toggle				{width:95px; height:35px;}
+.vote-check[data-size='lg'] > input + .toggle > .switch	{width:35px;}
+.vote-check[data-size='lg'] > input + .toggle:before,
+.vote-check[data-size='lg'] > input + .toggle:after		{font-size:1rem;}
+.vote-check[data-size='lg'] > input:not(:checked) + .toggle > .switch {right:calc(100% - 35px);}
+
+
+/* Style: Rounded */
+.vote-check[data-style='rounded'] > input + .toggle,
+.vote-check[data-style='rounded'] > input + .toggle > .switch {border-radius:50px;}
+.vote-check[data-style='rounded'] > input + .toggle:before {right:50%;}
+.vote-check[data-style='rounded'] > input + .toggle:after {left:50%;}
+
+/* Color: Green */
+.vote-check[data-color='green'] > input:checked + .toggle {background:#00d1b2;}
+.vote-check[data-color='green'] > input:checked + .toggle > .switch {border-color:#00d1b2;}
+      </style>
+
+</head>
+</html>
