@@ -44,16 +44,27 @@
 
    <div class="container">
 
-      <div id="idError" class="has-background-danger-dark has-text-danger-light"></div>
+      <div data-section="information">
+         <div id="idError" data-message style="display: none;">
+            <div class="notification is-danger">
+              <p></p>
+              <button class="delete"></button>
+            </div>         
+         </div>
+         <div id="idMessage" data-message style="display: none;">
+            <div class="notification is-info">
+              <p></p>
+              <button class="delete"></button>
+            </div>         
+         </div>
+      </div>
 
 <!--
 div[data-section="container"]
    div[data-section="tab"]
-      [data-tab="1"]
-      [data-tab="2"]
+      [data-index="1"] - [data-index="5"]
    div[data-section="content"]
-      [data-content="1"]
-      [data-content="2"]
+      [data-index="1"] - [data-index="5"]
 -->
       <div data-section="container">
          <div data-section="tab" class="tabs is-small" style="height: 5em;">
@@ -82,6 +93,7 @@ div[data-section="container"]
          </div>
       </div>
 
+<!--
       <div class="notification is-primary">
          <div class="content is-primary">
             <span id="idPollList" class="select is-rounded">
@@ -89,6 +101,15 @@ div[data-section="container"]
             <span class="is-size-4 is-pulled-right is-hidden-mobile">Välj omröstning i listan</span>
          </div>
       </div>
+-->
+      <nav class="navbar is-primary">
+         <div class="navbar-item">
+            <span id="idPollList" class="select is-rounded">
+
+            </span>
+         </div>
+      </nav>
+
 
 <!--
 div[data-section="container"]
@@ -106,9 +127,14 @@ div[data-section="container"]
                <li data-index="2"><a data-translate="page.vote.result">Resultat</a></li>
             </ul>
          </div>
+
+         <!-- Header for poll, here the poll name and description is shown  -->
          <div id="idPollOverview" class="box has-background-success-light">
             <h1 class="title is-2" data-title></h1>
-            <p class="is-5" data-description></p>
+            <p data-description></p>
+            <article class="panel has-background-white" data-section="link" style="display: none; margin-top: 1em; padding: 5px;">
+               <p class="panel-heading">Länkar</p>
+            </article>               
          </div>
 
          <div id="idContent" data-section="content">
@@ -164,6 +190,15 @@ div[data-section="container"]
          });
 
       });
+
+      let eButtonCloseMessage = document.getElementById("idMessage").querySelector("button");
+      eButtonCloseMessage.addEventListener("click", e => { document.getElementById("idMessage").style.display = "none"; });
+
+      /*
+       * ## Configure special elements in page
+       * - Close button for message
+       */
+
 
 
    </script>

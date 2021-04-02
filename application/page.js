@@ -2,96 +2,25 @@
 # Navigate
    ## Functions
    SetActivePoll - Calling this method triggers a chain of operations that will display needed information about active poll
-   OnResponse - Unpack response from server
+   OpenMessage - Open a new message for user
    ProcessResponse - Process responses from server
+
+|Name|Description
+|:-|:-|
+| SetActivePoll | Calling this method triggers a chain of operations that will display needed information about active poll |
+| OpenMessage | Show message to user |
+| ProcessResponse | Process responses from server |
+| QUERYGetPollOverview | Get information about selected poll. query = poll_overview. query = `poll_overview` |
+| QUERYGetPollLinks | Get links for poll. Query used is `poll_links` |
+| RESULTCreatePollOverview | Process result from  `poll_overview`|
+|||
+|||
+|||
 */
 import { CTableData, enumReturn } from "./../library/TableData.js";
 import { CTableDataTrigger } from "./../library/TableDataTrigger.js";
 import { CUITableText } from "./../library/UITableText.js";
 import { CQuery } from "./../server/Query.js";
-/**
- * Internal state for sections in page
- * This class is mainly used to handle asynchronous calls to get information from a series of queries related to state.
- * When only one query is needed to get information for command it is  easier, but here there are multiple queries so
- * we need some sort of logic to know when all queries has been executed and in what order.
- */
-class CPageState {
-    constructor(options) {
-        const o = options;
-        this.m_bActive = false;
-        this.m_eContainer = o.container || null;
-        this.m_sSection = o.section;
-        this.m_sName = o.name;
-        this.m_iQuery = 0;
-        this.m_aQuery = o.query;
-        this.m_aTableData = [];
-    }
-    get container() { return this.m_eContainer; }
-    get name() { return this.m_sName; }
-    get section() { return this.m_sSection; }
-    IsActive() { return this.m_bActive; } // Is state active ? Only one active state for each page section
-    GetQueryName() {
-        const aQuery = this.GetOngoingQuery();
-        if (aQuery)
-            return aQuery[0];
-        return null;
-    }
-    /**
-     * Get first query that doesn't have the state delivered. If all queries has del
-     */
-    GetOngoingQuery() {
-        for (let i = 0; i < this.m_aQuery.length; i++) {
-            const aQuery = this.m_aQuery[i];
-            if (aQuery[1] !== 2 /* delivered */)
-                return aQuery;
-        }
-        return null;
-    }
-    /**
-     * Set condition/s to current active query.
-     * Used when one result is dependent of previous results in chain of queries
-     * @param {details.condition[]} aCondition
-     */
-    SetCondition(aCondition) {
-        let a = this.GetOngoingQuery();
-        a[2] = aCondition;
-    }
-    AddTableData(iKey, oTD) { this.m_aTableData.push([iKey, oTD]); }
-    GetTableData(iKey) {
-        let a = [];
-        let i = this.m_aTableData.length;
-        while (--i >= 0) {
-            if (typeof iKey === "number" && this.m_aTableData[i][0] === iKey) {
-                a.push(this.m_aTableData[i][1]);
-                break;
-            }
-            else
-                a.push(this.m_aTableData[i][1]);
-        }
-        return a;
-    }
-    /**
-     * Set if active or not active
-     * When set to active add condition or conditions to query/queries. Conditions may be filled later from returned results
-     * @param {[details.condition][]} [aCondition] condition set to queries that is executed. index will be matched for query index in query array for page state.
-     */
-    SetActive(aCondition) {
-        this.m_aQuery.forEach((aQuery, i) => {
-            if (aCondition && i < aCondition.length) {
-                aQuery[2] = aCondition[i];
-            }
-            else
-                aQuery[2] = null;
-        });
-        this.m_bActive = aCondition ? true : false;
-        this.m_aTableData = []; // Delete old table data when activated, prepare for new results
-        return this.m_aQuery;
-    }
-    Reset() {
-        this.m_iQuery = 0; // set to first query
-        this.m_aQuery.forEach(a => { a[1] = 0 /* send */, a[2] = null; });
-    }
-}
 export class CPage {
     // ## One single poll can have one or more questions. Each questions has one or more answers. 
     // ## When poll is selected page gets information about each question in poll and render information 
@@ -111,6 +40,12 @@ export class CPage {
             new CPageState({ section: "body", name: "vote", container: document.getElementById("idPollVote"), query: [["poll_question_list", 0 /* send */, []], ["poll_answer", 0 /* send */, []]] }),
             new CPageState({ section: "body", name: "count", container: document.getElementById("idPollCount"), query: [["poll_question_list", 0 /* send */, []], ["poll_answer_count", 0 /* send */, []]] })
         ];
+        this.m_oElement = {
+            "error": document.getElementById("idError"),
+            "message": document.getElementById("idMessage")
+        };
+        this.m_aVoteHistory = [];
+        this.HISTORYSerialize(false);
         this.QUESTION_STATE = { NO_RESULT: 0, WAITING_FOR_RESULT: 1, RESULT_DELIVERED: 2, VOTE_READY_TO_SEND: 3 };
     }
     get app() { return this.m_oApplication; } // get application object
@@ -227,6 +162,7 @@ export class CPage {
         this.m_aQuestion = []; // clear state and items with poll informaiton
         document.getElementById("idPollVote").innerHTML = "";
         document.getElementById("idPollCount").innerHTML = "";
+        this.OpenMessage(); // close any open message
     }
     /**
      * Is Poll ready to send  to server to register vote for voter?
@@ -234,7 +170,7 @@ export class CPage {
      * @returns {boolean} true if questions are ready to be sent to server, false if not
      */
     IsReadyToVote(bUpdateVoteButton) {
-        let oPageState = this.GetPageState("body", this.view_mode);
+        let oPageState = this.GetPageState("body", "vote"); // page state 2body.vote" holds information about the user vote
         let aTD = oPageState.GetTableData();
         let iOkCount = 0;
         aTD.forEach(oTD => {
@@ -251,21 +187,35 @@ export class CPage {
         }
         return bReady;
     }
+    OpenMessage(sMessage, sType) {
+        Object.values(this.m_oElement).forEach(e => { e.style.display = "none"; });
+        if (sMessage === undefined)
+            return;
+        sType = sType || "message";
+        let e = this.m_oElement[sType];
+        e = e.querySelector("p");
+        e.textContent = sMessage;
+        e.closest("[data-message]").style.display = "block";
+        window.scrollTo(0, 0);
+    }
     /**
      * Collect information about what voter has selected and sent that to server to register vote
      */
     SendVote() {
+        console.assert(this.GetActivePoll() > 0, "Active poll isn't set.");
         console.assert(this.IsReadyToVote(), "Trying to send vote to server but vote isn't ready to be sent.");
         let aValue = [];
-        this.m_aQuestion.forEach(a => {
-            const oTD = a[3]; // index 3 in array holds table data
-            const aRow = oTD.CountValue([-1, 1], 1, enumReturn.Array);
+        // ## Extract key values from, values for poll is found i page state body.vote
+        const aTD = this.GetPageState("body", "vote").GetTableData();
+        aTD.forEach(oTD => {
+            const aRow = oTD.CountValue([-1, "check"], 1, enumReturn.Array); // get values from "check" column with value 1
             aRow.forEach(iRowKey => {
-                aValue.push({ index: 2, value: oTD.CELLGetValue(iRowKey, 0) }); // column with index 2 has foreign key to answer
+                // IMPORTANT! Column 2 in query on server gets value from "PollAnswerK". This binds user vote to answer in poll
+                aValue.push({ index: 2, value: oTD.CELLGetValue(iRowKey, "PollAnswerK") }); // column with index 2 gets key to answer
             });
         });
         let oQuery = new CQuery({
-            header: [{ name: "PollK", value: this.m_iActivePoll }],
+            header: [{ name: "PollK", value: this.GetActivePoll() }],
             values: aValue
         });
         let oDocument = (new DOMParser()).parseFromString("<document/>", "text/xml");
@@ -278,6 +228,7 @@ export class CPage {
         let oCommand = { command: "add_rows", query: "poll_vote", set: "vote", table: "TPollVote1" };
         let request = this.app.request;
         request.Get("SCRIPT_Run", { file: "PAGE_result_edit.lua", json: request.GetJson(oCommand) }, sXml);
+        this.m_iActivePollOld = this.m_iActivePoll; // keep poll index for later when response from server is returned
     }
     ProcessResponse(eItem, sName) {
         let oResult = JSON.parse(eItem.textContent);
@@ -324,6 +275,9 @@ export class CPage {
                     else if (sQueryName === "poll_overview") {
                         this.RESULTCreatePollOverview("idPollOverview", oResult);
                     }
+                    else if (sQueryName === "poll_links") {
+                        this.RESULTCreatePollOverviewLinks("idPollOverview", oResult);
+                    }
                     /*
                     else if(sQueryName === "poll_question_list") {
                        this.RESULTCreateQuestionPanel("idPollQuestionList", oResult);
@@ -347,11 +301,34 @@ export class CPage {
                 if (sType === "add_rows") {
                     const sQueryName = oResult.name;
                     if (sQueryName === "poll_vote") {
-                        this.view_mode = "count";
-                        this.SetActivePoll();
+                        this.OpenMessage("Din röst har blivit registrerad!");
+                        if (typeof this.m_iActivePollOld === "number") {
+                            this.m_aVoteHistory.push(this.m_iActivePollOld);
+                            this.HISTORYSerialize(true);
+                        }
+                        this.m_iActivePollOld = null;
+                        //this.view_mode = "count";
+                        //this.SetActivePoll();
                     }
                 }
                 break;
+        }
+    }
+    /**
+     * Check if poll is found in history from local storage
+     * @param {number} iPoll poll key
+     */
+    HISTORYFindPoll(iPoll) {
+        return this.m_aVoteHistory.findIndex(i => i === iPoll) !== -1 ? true : false;
+    }
+    HISTORYSerialize(bSave) {
+        if (bSave === true) {
+            localStorage.setItem("poll_votes", JSON.stringify(this.m_aVoteHistory));
+        }
+        else {
+            const s = localStorage.getItem("poll_votes"); // read votes saved on computer
+            if (s)
+                this.m_aVoteHistory = JSON.parse(s);
         }
     }
     /**
@@ -372,6 +349,8 @@ export class CPage {
     }
     /**
      * Get information about selected poll. query = poll_overview
+     * @param {number} iPoll   Index to selected poll
+     * @param {string} sSimple name for selected poll
      */
     QUERYGetPollOverview(iPoll, sSimple) {
         let request = this.app.request;
@@ -380,6 +359,19 @@ export class CPage {
         });
         let sXml = oQuery.CONDITIONGetXml();
         let oCommand = { command: "add_condition_to_query get_result", delete: 1, query: "poll_overview", set: "vote", count: 50, format: 1, start: 0 };
+        request.Get("SCRIPT_Run", { file: "PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
+    }
+    /**
+     * Get links associated to poll
+     * @param {number} iPoll   Index to selected poll
+     */
+    QUERYGetPollLinks(iPoll) {
+        let request = this.app.request;
+        let oQuery = new CQuery({
+            conditions: [{ table: "TPoll1", id: "PollK", value: iPoll }]
+        });
+        let sXml = oQuery.CONDITIONGetXml();
+        let oCommand = { command: "add_condition_to_query get_result", delete: 1, query: "poll_links", set: "vote", count: 50, format: 1, start: 0 };
         request.Get("SCRIPT_Run", { file: "PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
     }
     /**
@@ -557,10 +549,11 @@ export class CPage {
         }
         let oTD = new CTableData({ id: oResult.id, name: oResult.name });
         oTD.ReadArray(oResult.table.body, { begin: 0 });
-        const sName = oTD.CELLGetValue(0, 1);
-        const sDescription = oTD.CELLGetValue(0, 2);
-        const iCount = oTD.CELLGetValue(0, 3);
-        if (iCount > 0) {
+        const sName = oTD.CELLGetValue(0, 1); // Poll name
+        const sDescription = oTD.CELLGetValue(0, 2); // Poll description
+        const iQuestionCount = oTD.CELLGetValue(0, 3); // Number of questions in poll
+        const iLinkCount = oTD.CELLGetValue(0, 4); // Links assocated with poll
+        if (iQuestionCount > 0) {
             // ## Generate title for poll
             let eTitle = eRoot.querySelector("[data-title]");
             eTitle.textContent = sName;
@@ -569,7 +562,38 @@ export class CPage {
                 eDescription.textContent = sDescription || "";
             let eCount = eRoot.querySelector("[data-count]");
             if (eCount)
-                eCount.textContent = iCount.toString();
+                eCount.textContent = iQuestionCount.toString();
+        }
+        let eLink = eRoot.querySelector('[data-section="link"]');
+        if (iLinkCount > 0) {
+            eLink.style.display = "block";
+            this.QUERYGetPollLinks(this.GetActivePoll());
+        }
+        else {
+            eLink.style.display = "none";
+        }
+    }
+    RESULTCreatePollOverviewLinks(eRoot, oResult) {
+        if (typeof eRoot === "string")
+            eRoot = document.getElementById(eRoot);
+        let oTD = new CTableData({ id: oResult.id, name: oResult.name });
+        oTD.ReadArray(oResult.table.body, { begin: 0 });
+        let eLink = eRoot.querySelector('[data-section="link"]');
+        // remove links if any found
+        let eA = eLink.lastElementChild;
+        while (eA.tagName === "A") {
+            let e = eA;
+            eA = eA.previousElementSibling;
+            e.remove();
+        }
+        const iCount = oTD.ROWGetCount();
+        let eTemplate = document.createElement('div');
+        for (let iRow = 0; iRow < iCount; iRow++) {
+            const sLink = oTD.CELLGetValue(iRow, 1); // link 
+            eTemplate.innerHTML = sLink;
+            let eA = eTemplate.firstElementChild;
+            eA.className = "panel-block";
+            eLink.appendChild(eA);
         }
     }
     /**
@@ -597,17 +621,23 @@ export class CPage {
         if (this.view_mode === "vote") {
             // ## Create section for vote button
             let eVote = eRoot.querySelector('[data-section="vote"]');
-            if (!eVote) {
-                eVote = document.createElement("div");
-                eVote.dataset.section = "vote";
-                eRoot.appendChild(eVote);
-                eVote.innerHTML = `<button class='button is-white is-rounded is-primary is-large' style='width: 300px;'>RÖSTA</button>`;
+            eVote = document.createElement("div");
+            eVote.dataset.section = "vote";
+            eRoot.appendChild(eVote);
+            if (this.HISTORYFindPoll(this.GetActivePoll()) === false) {
+                if (eVote) {
+                    eVote.innerHTML = `<button class='button is-white is-rounded is-primary is-large' style='width: 300px;'>RÖSTA</button>`;
+                }
+                let eButtonVote = eVote.querySelector("button");
+                eButtonVote.setAttribute("disabled", "");
+                eButtonVote.addEventListener("click", (e) => {
+                    e.srcElement.style.display = "none";
+                    this.SendVote();
+                });
             }
-            let eButtonVote = eVote.querySelector("button");
-            eButtonVote.setAttribute("disabled", "");
-            eButtonVote.addEventListener("click", e => {
-                this.SendVote();
-            });
+            else {
+                eVote.innerText = `Röst är registrerad för aktuell fråga.`;
+            }
         }
         let oTD = new CTableData({ id: oResult.id, name: oResult.name });
         oTD.ReadArray(oResult.table.body, { begin: 0 });
@@ -810,5 +840,88 @@ export class CPage {
                 }
                 break;
         }
+    }
+}
+/**
+ * Internal state for sections in page
+ * This class is mainly used to handle asynchronous calls to get information from a series of queries related to state.
+ * When only one query is needed to get information for command it is  easier, but here there are multiple queries so
+ * we need some sort of logic to know when all queries has been executed and in what order.
+ */
+class CPageState {
+    constructor(options) {
+        const o = options;
+        this.m_bActive = false;
+        this.m_eContainer = o.container || null;
+        this.m_sSection = o.section;
+        this.m_sName = o.name;
+        this.m_iQuery = 0;
+        this.m_aQuery = o.query;
+        this.m_aTableData = [];
+    }
+    get container() { return this.m_eContainer; }
+    get name() { return this.m_sName; }
+    get section() { return this.m_sSection; }
+    IsActive() { return this.m_bActive; } // Is state active ? Only one active state for each page section
+    GetQueryName() {
+        const aQuery = this.GetOngoingQuery();
+        if (aQuery)
+            return aQuery[0];
+        return null;
+    }
+    /**
+     * Get first query that doesn't have the state delivered. If all queries has del
+     */
+    GetOngoingQuery() {
+        for (let i = 0; i < this.m_aQuery.length; i++) {
+            const aQuery = this.m_aQuery[i];
+            if (aQuery[1] !== 2 /* delivered */)
+                return aQuery;
+        }
+        return null;
+    }
+    /**
+     * Set condition/s to current active query.
+     * Used when one result is dependent of previous results in chain of queries
+     * @param {details.condition[]} aCondition
+     */
+    SetCondition(aCondition) {
+        let a = this.GetOngoingQuery();
+        a[2] = aCondition;
+    }
+    AddTableData(iKey, oTD) { this.m_aTableData.push([iKey, oTD]); }
+    GetTableData(iKey) {
+        let a = [];
+        let i = this.m_aTableData.length;
+        while (--i >= 0) {
+            if (typeof iKey === "number" && this.m_aTableData[i][0] === iKey) {
+                a.push(this.m_aTableData[i][1]);
+                break;
+            }
+            else
+                a.push(this.m_aTableData[i][1]);
+        }
+        return a;
+    }
+    /**
+     * Set if active or not active
+     * When set to active add condition or conditions to query/queries. Conditions may be filled later from returned results
+     * @param {[details.condition][]} [aCondition] condition set to queries that is executed. index will be matched for query index in query array for page state.
+     */
+    SetActive(aCondition) {
+        this.m_aQuery.forEach((aQuery, i) => {
+            if (aCondition && i < aCondition.length) {
+                aQuery[2] = aCondition[i];
+            }
+            else
+                aQuery[2] = null;
+        });
+        this.m_bActive = aCondition ? true : false;
+        this.m_aTableData = []; // Delete old table data when activated, prepare for new results
+        return this.m_aQuery;
+    }
+    Reset() {
+        this.m_iQuery = 0; // set to first query
+        this.m_aQuery.forEach(a => { a[1] = 0 /* send */, a[2] = null; });
     }
 }
