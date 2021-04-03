@@ -321,7 +321,7 @@ export class CUITableText {
             iColumn = _Column;
         }
         const iDataRow = this._row_in_data(iRow), iDataColumn = this._column_in_data(iColumn); // index for row and column in CTableData, its physical position
-        const oColumn = this.data.COLUMNGet(iDataColumn);
+        const oColumn = this.data.COLUMNGet(iDataColumn, undefined, true);
         if (oTriggerData) {
             oTriggerData.column = oColumn;
             oTriggerData.data = this.data;
@@ -349,7 +349,7 @@ export class CUITableText {
                     this.data.HISTORYPush(iDataRow, iDataColumn); // add to history
                 let aRow = this.m_aRowBody[iRow];
                 aRow[iColumn] = value; // Modify value internally
-                this.data.CELLSetValue(iDataRow, iDataColumn, value); // Set value to cell
+                this.data.CELLSetValue(iDataRow, iDataColumn, value, true); // Set value to cell
                 if (this.is_state(2 /* SetDirtyRow */))
                     this.data.DIRTYSet(iDataRow); // Set row as dirty
             }
@@ -365,7 +365,7 @@ export class CUITableText {
                     return;
             }
             if (this.SetCellError(iRow, iColumn, value, _result[1], oTriggerData) === true) {
-                this.data.CELLSetValue(iDataRow, iDataColumn, value);
+                this.data.CELLSetValue(iDataRow, iDataColumn, value, true);
             }
         }
     }
@@ -458,7 +458,7 @@ export class CUITableText {
             }
             return;
         }
-        let aHeader = this.data.COLUMNGetPropertyValue(true, ["alias", "name"], (column) => {
+        let aHeader = this.data.COLUMNGetPropertyValue(true, ["alias", "name"], true, (column) => {
             if (column.position.hide)
                 return false;
             return true;
@@ -466,16 +466,16 @@ export class CUITableText {
         this.m_aColumnPhysicalIndex = [];
         aHeader.forEach((a) => { this.m_aColumnPhysicalIndex.push(a[0]); });
         this.m_aColumnPosition = [];
-        let aPosition = this.data.COLUMNGetPropertyValue(this.m_aColumnPhysicalIndex, "position");
+        let aPosition = this.data.COLUMNGetPropertyValue(this.m_aColumnPhysicalIndex, "position", true);
         aPosition.forEach(aP => {
             this.m_aColumnPosition.push(aP[1]);
         });
         this.m_aColumnFormat = [];
-        let aFormat = this.data.COLUMNGetPropertyValue(this.m_aColumnPhysicalIndex, "format");
+        let aFormat = this.data.COLUMNGetPropertyValue(this.m_aColumnPhysicalIndex, "format", true);
         aFormat.forEach(aF => {
             this.m_aColumnFormat.push(aF[1]);
         });
-        this.m_oRowRows = this.data.GetRowRows();
+        this.m_oRowRows = this.data.GetRowRows(true);
         this.m_iColumnCount = aHeader.length; // Set total column count
         if (this.m_acallRenderer)
             this.COLUMNSetRenderer(this.m_iColumnCount - 1); // Make sure that array for renders holds as many columns as columns
@@ -620,7 +620,7 @@ export class CUITableText {
             }
         }
         if (typeof iColumn === "number" && iColumn >= 0)
-            return [iColumn, this.data.COLUMNGet(iColumn)];
+            return [iColumn, this.data.COLUMNGet(iColumn, undefined, true)];
         return null;
     }
     /**
@@ -791,7 +791,7 @@ export class CUITableText {
             _Row = [_Row];
         for (let i = 0; i < _Row.length; i++) {
             const iRow = _Row[i];
-            let aRow = this.data.ROWGet(iRow);
+            let aRow = this.data.ROWGet(iRow, true);
             aRow.forEach((_Value, iIndex) => {
                 let oColumn = this.data.COLUMNGet(iIndex, false, true);
                 let _result = CTableData.ValidateValue(_Value, oColumn);
@@ -1075,7 +1075,7 @@ export class CUITableText {
             if (bCall) {
                 let bRender = true;
                 for (let j = 0; j < this.m_acallRender.length; j++) {
-                    let b = this.m_acallRender[j].call(this, "beforeHeaderValue", aName, eSpan, this.data.COLUMNGet(this._column_in_data(i)));
+                    let b = this.m_acallRender[j].call(this, "beforeHeaderValue", aName, eSpan, this.data.COLUMNGet(this._column_in_data(i), undefined, true));
                     if (b === false)
                         bRender = false;
                 }
@@ -1087,7 +1087,7 @@ export class CUITableText {
                 eSpan.title = eSpan.innerText;
                 eSpan.dataset.c = aHeader[i][0].toString(); // set column index
                 if (bCall)
-                    this.m_acallRender.forEach((call) => { call.call(this, "afterHeaderValue", aName, eSpan, this.data.COLUMNGet(this._column_in_data(i))); });
+                    this.m_acallRender.forEach((call) => { call.call(this, "afterHeaderValue", aName, eSpan, this.data.COLUMNGet(this._column_in_data(i), undefined, true)); });
                 eSpan = eSpan.nextElementSibling;
             }
         }
@@ -1097,7 +1097,7 @@ export class CUITableText {
         eSection = eSection || this.GetSection("body");
         let aResult;
         //let sClass: string = <string>CTableData.GetPropertyValue(this.m_oStyle, false, "class_value") || "";
-        let aStyle = this.data.COLUMNGetPropertyValue(this.m_aColumnPhysicalIndex, "style"); // position data for columns
+        let aStyle = this.data.COLUMNGetPropertyValue(this.m_aColumnPhysicalIndex, "style", true); // position data for columns
         const bSetValue = this.is_state(8 /* SetValue */); // If try to set value for html element, when you have INPUT elements in column.
         if (Array.isArray(_1)) {
             aResult = _1;
@@ -1148,7 +1148,7 @@ export class CUITableText {
                     const iC = aColumn[i]; // index to column in table data
                     let e = this.ELEMENTGetCellValue(eColumn); // get cell value element
                     let sValue = aRow[iC]; // value for active cell
-                    const oColumn = this.data.COLUMNGet(this._column_in_data(i));
+                    const oColumn = this.data.COLUMNGet(this._column_in_data(i), undefined, true);
                     const callRenderer = this.COLUMNGetRenderer(i); // get renderer for cell if custom rendering
                     if (bCall) {
                         let bRender = true;
@@ -1160,8 +1160,8 @@ export class CUITableText {
                         if (bRender === false)
                             continue;
                     }
-                    if (Object.keys(aStyle[iC][1]).length > 0)
-                        Object.assign(e.style, aStyle[iC][1]);
+                    if (Object.keys(aStyle[i][1]).length > 0)
+                        Object.assign(e.style, aStyle[i][1]);
                     if (bSetValue === false) {
                         if (callRenderer) {
                             callRenderer.call(this, e, sValue, [[iIndex, i], [iRow, iC], oColumn]); // custom render for column
@@ -1301,7 +1301,7 @@ export class CUITableText {
             [_Row, iColumn] = _Row;
         let sClass = CTableData.GetPropertyValue(this.m_oStyle, false, "class_value") || "";
         let eElement = this.ELEMENTGetCellValue(this.ELEMENTGetCell(_Row, iColumn));
-        let sValue = this.data.CELLGetValue(this._row_in_data(_Row), this._column_in_data(iColumn));
+        let sValue = this.data.CELLGetValue(this._row_in_data(_Row), this._column_in_data(iColumn), 1 /* Raw */ | 2 /* Format */);
         let bValue = false;
         const s = eElement.tagName;
         if (s === "INPUT" || s === "TEXTAREA" || s === "METER")
@@ -1309,7 +1309,7 @@ export class CUITableText {
         const callRenderer = this.COLUMNGetRenderer(iColumn);
         if (callRenderer) {
             const iDataColumn = this._column_in_data(iColumn);
-            const oColumn = this.data.COLUMNGet(this._column_in_data(iDataColumn));
+            const oColumn = this.data.COLUMNGet(this._column_in_data(iDataColumn), undefined, true);
             callRenderer.call(this, eElement, sValue, [[_Row, iColumn], [this._row_in_data(_Row), iDataColumn], oColumn]); // custom render for column
         }
         else if (sValue !== null && sValue != void 0) {
@@ -1375,7 +1375,7 @@ export class CUITableText {
                 const aError = aValueError[i];
                 let eCell = this.ELEMENTGetCell(aError, "body");
                 if (bCall) { // external rendering ?
-                    oColumn = this.data.COLUMNGet(this._column_in_data(aError[1]));
+                    oColumn = this.data.COLUMNGet(this._column_in_data(aError[1]), undefined, true);
                     for (let j = 0; j < this.m_acallRender.length; j++) {
                         let b = this.m_acallRender[j].call(this, "beforeErrorValue", aError, eCell, oColumn);
                         if (b === false)
@@ -1618,11 +1618,12 @@ export class CUITableText {
             eRow.dataset.r = iRow.toString();
             eRow.dataset.c_row = "C" + aColumn.join(",C") + ",";
             aColumn.forEach((i, j) => {
-                if (i === undefined)
-                    i = j;
+                let iColumn = this._column_in_ui(i);
+                if (iColumn === -1)
+                    iColumn = j;
                 let e = document.createElement(sHtmlCell);
-                e.dataset.c = i.toString();
-                const oFormat = this.m_aColumnFormat[i];
+                e.dataset.c = iColumn.toString();
+                const oFormat = this.m_aColumnFormat[iColumn];
                 if (typeof oFormat.html === "string")
                     e.innerHTML = oFormat.html;
                 else if (sHtmlValue)

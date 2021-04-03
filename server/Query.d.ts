@@ -12,10 +12,10 @@ declare namespace details {
         value?: unknown;
     };
     type value = {
-        index: number;
-        name: string;
+        index?: number;
+        name?: string;
         value?: unknown;
-        is_null: number;
+        is_null?: number;
     };
     type construct = {
         header?: header[];

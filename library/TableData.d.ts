@@ -275,7 +275,7 @@ export declare class CTableData {
      * @param  {number[]} [aMatch] Recalculate column positions
      * Return `CRowRows` object that has raw data on how to design row values.
      */
-    GetRowRows(aMatch?: number[]): CRowRows;
+    GetRowRows(aMatch?: number[] | boolean, bRaw?: boolean): CRowRows;
     Sort(aBody: unknown[][]): void;
     /**
      * Check if any or selected row is dirty (dirty = values are modified)
@@ -340,7 +340,7 @@ export declare class CTableData {
     /**
      * Update matching index for objects that uses table data based on property values that marks columns as hidden or disabled
      */
-    COLUMNUpdatePositionIndex(): void;
+    COLUMNUpdatePositionIndex(bInternal: boolean): void;
     /**
      * Count columns and return how many.
      * This can also count column with properties, like how many key columns there are.
@@ -569,8 +569,9 @@ export declare class CTableData {
     /**
      * Generate information how fields are placed. the position.row and position.hide column properties
      * are checked and based on those information about where field is placed is generated.
+     * @param {boolean} [bRaw] Use raw position in table data, do not take the index property in position
      */
-    _collect_row_design(): [[number, number, HTMLElement], number[]][];
+    _collect_row_design(bRaw?: boolean): [[number, number, HTMLElement], number[]][];
 }
 /**
  * CRowRows is used to collect information about the layout for each row in CTableData.

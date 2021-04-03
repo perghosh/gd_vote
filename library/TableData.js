@@ -139,8 +139,8 @@ export class CTableData {
                         aError = [false, sKey];
                     break;
                 case "min":
-                    if (((eType & 262144 /* group_string */) && _Value.length < _rule) ||
-                        ((eType & 65536 /* group_number */) && _Value < _rule))
+                    if (((eType & 262144 /* group_string */) && (typeof _Value !== "string" || _Value.length < _rule)) ||
+                        ((eType & 65536 /* group_number */) && (typeof _Value !== "number" || _Value < _rule)))
                         aError = [false, sKey];
                     break;
                 case "pattern":
@@ -351,6 +351,8 @@ export class CTableData {
            }
         };
         */
+        if (aData.length === 0)
+            return; // no rows ?
         let aRow = aData[0];
         if (this.COLUMNGetCount() === 0) {
             aRow.forEach((sName) => {
@@ -415,8 +417,12 @@ export class CTableData {
      * @param  {number[]} [aMatch] Recalculate column positions
      * Return `CRowRows` object that has raw data on how to design row values.
      */
-    GetRowRows(aMatch) {
-        let aRows = this._collect_row_design();
+    GetRowRows(aMatch, bRaw) {
+        if (typeof aMatch === "boolean") {
+            bRaw = aMatch;
+            aMatch = undefined;
+        }
+        let aRows = this._collect_row_design(bRaw);
         let oRR = new CRowRows(aRows);
         if (aMatch)
             oRR.OffsetColumns(aMatch);
@@ -573,23 +579,26 @@ export class CTableData {
     COLUMNGet(_Index, bNull, bRaw) {
         if (bRaw)
             return this.m_aColumn[_Index];
-        else if (!bNull)
-            return this._column(_Index);
         let iIndex = this._index(_Index);
-        if (iIndex === -1)
+        if (bNull === true && iIndex === -1)
             return null;
         return this.m_aColumn[iIndex];
     }
     /**
      * Update matching index for objects that uses table data based on property values that marks columns as hidden or disabled
      */
-    COLUMNUpdatePositionIndex() {
+    COLUMNUpdatePositionIndex(bInternal) {
+        if (bInternal === true)
+            this.m_aColumnIndex = [];
         let iIndex = 0;
         this.m_aColumn.forEach((c, i) => {
-            if (c.position.hide)
+            if (c.position.hide) {
                 c.position.index = -1;
+            }
             else {
                 c.position.index = iIndex;
+                if (bInternal === true)
+                    this.m_aColumnIndex.push(i); // set physical index to column 
                 iIndex++;
             }
         });
@@ -1556,7 +1565,7 @@ export class CTableData {
         }
         else {
             iR = iRow;
-            iC = _Column; // if raw then _Column has to be a number
+            iC = _Column + 1; // if raw then _Column has to be a number, just add one for the row key column
         }
         return [iR, iC];
     }
@@ -1749,13 +1758,17 @@ export class CTableData {
     /**
      * Generate information how fields are placed. the position.row and position.hide column properties
      * are checked and based on those information about where field is placed is generated.
+     * @param {boolean} [bRaw] Use raw position in table data, do not take the index property in position
      */
-    _collect_row_design() {
+    _collect_row_design(bRaw) {
         let aRow = [[[0, 0, null], []]]; // array used to collect information for each row, format described [ [row index, row priority ], [column indexes...] ] 
         let i = this.m_aColumn.length;
         this.m_aColumn.forEach((oC, iIndex) => {
+            let iColumn = iIndex;
             const position = oC.position;
-            let iColumn = typeof position.index === "number" ? position.index : iIndex;
+            if (bRaw !== true) {
+                iColumn = typeof position.index === "number" ? position.index : iIndex;
+            }
             if (position.row) { //  is field not placed in main row ?
                 let bPushed = false;
                 let i = aRow.length;

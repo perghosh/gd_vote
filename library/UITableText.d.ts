@@ -1,6 +1,13 @@
 import { CTableData, CRowRows, enumMove, IUITableData, tabledata_column, tabledata_position, tabledata_format } from "./TableData.js";
 import { edit } from "./TableDataEdit.js";
 import { CTableDataTrigger, EventDataTable } from "./TableDataTrigger.js";
+export declare const enum enumState {
+    HtmlValue = 1,
+    SetDirtyRow = 2,
+    SetHistory = 4,
+    SetValue = 8,
+    SetOneClickActivate = 16
+}
 declare namespace details {
     type construct = {
         body?: unknown[][];

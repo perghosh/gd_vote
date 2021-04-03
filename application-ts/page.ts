@@ -7,11 +7,16 @@
 
 |Name|Description
 |:-|:-|
+
+| SendVoter | Create new voter for collected information when user tried to logon. |
 | SetActivePoll | Calling this method triggers a chain of operations that will display needed information about active poll |
 | OpenMessage | Show message to user |
 | ProcessResponse | Process responses from server |
+| QUERYGetLogin | Get login information for voter. query = `login` |
 | QUERYGetPollOverview | Get information about selected poll. query = poll_overview. query = `poll_overview` |
 | QUERYGetPollLinks | Get links for poll. Query used is `poll_links` |
+| RESULTCreateLogin | Create login section |
+| RESULTCreateFindVoter | Result from finding voter, this is called if user tries to login |
 | RESULTCreatePollOverview | Process result from  `poll_overview`|
 |||
 |||
@@ -25,7 +30,7 @@ import { edit } from "./../library/TableDataEdit.js";
 import { CTableDataTrigger, EventDataTable } from "./../library/TableDataTrigger.js";
 
 
-import { CUITableText, uitabledata_construct } from "./../library/UITableText.js"
+import { CUITableText, enumState, uitabledata_construct } from "./../library/UITableText.js"
 import { CQuery } from "./../server/Query.js"
 import { CApplication } from "application.js"
 
@@ -51,6 +56,7 @@ export class CPage {
    m_aQuestion: [number,boolean,number, CTableData][];
    m_aPageState: CPageState[]; 
    m_oPageState: CPageState;        // current page state that is being processed
+   m_oTDVoter: CTableData;           // User data for voter
    m_sViewMode: string;             // view mode page is in
    m_aVoteHistory: number[];
    QUESTION_STATE: any;
@@ -81,7 +87,8 @@ export class CPage {
 
       this.m_oElement = {
          "error": document.getElementById("idError"),
-         "message": document.getElementById("idMessage")
+         "message": document.getElementById("idMessage"),
+         "warning": document.getElementById("idWarning")
       };
 
       this.m_aVoteHistory = [];
@@ -233,13 +240,20 @@ export class CPage {
       return bReady;
    }
 
-   OpenMessage(sMessage?: string, sType?: string) {
+   /**
+    * Open message in message section. if no parameters then message is removed
+    * @param {string} [sMessage] message to user
+    * @param {string} [sType] type of message `message` | `error` | `warning`
+    * @param {boolean} [bHtml] if text is html formated
+    */
+   OpenMessage(sMessage?: string, sType?: string, bHtml?: boolean) {
       Object.values( this.m_oElement ).forEach(e => { e.style.display = "none"; });
       if( sMessage === undefined ) return;
       sType = sType || "message";
       let e = this.m_oElement[sType];
       e = e.querySelector("p");
-      e.textContent = sMessage;
+      if( bHtml === true ) e.innerHTML = sMessage;
+      else e.textContent = sMessage;
       (<HTMLElement>e.closest("[data-message]")).style.display = "block";
       window.scrollTo(0,0);
    }
@@ -279,6 +293,27 @@ export class CPage {
       let request = this.app.request;
       request.Get("SCRIPT_Run", { file: "PAGE_result_edit.lua", json: request.GetJson(oCommand) }, sXml);
       this.m_iActivePollOld = this.m_iActivePoll;                             // keep poll index for later when response from server is returned
+   }
+
+   /**
+    * Create new voter for collected information when user tried to logon.
+    * NOTE: This needs to be modified because it cant be that easy to create new users
+    */
+   SendVoter() {
+      const sName = this.m_oTDVoter.CELLGetValue(0,"FName");
+      const sAlias = this.m_oTDVoter.CELLGetValue(0,"FAlias");
+      const sMail = this.m_oTDVoter.CELLGetValue(0,"FMail");
+
+      let oQuery = new CQuery({
+         values: [ { name: "FName", value: sName }, { name: "FAlias", value: sAlias }, { name: "FMail", value: sMail }]
+      });
+
+      let request = this.app.request;
+      let oDocument = (new DOMParser()).parseFromString("<document/>", "text/xml");
+      oQuery.VALUEGetXml({index: 0, values: "row", document: true}, oDocument);
+      const sXml = (new XMLSerializer()).serializeToString(oDocument);
+      let oCommand = { command: "add_rows", query: "login", set: "vote", table: "TVoter1" };
+      request.Get("SCRIPT_Run", { file: "PAGE_result_edit.lua", json: request.GetJson(oCommand) }, sXml);
    }
 
 
@@ -321,7 +356,7 @@ export class CPage {
             }
 
             if(sQueryName === "login") {
-               this.RESULTCreateLogin("idTopSection", oResult.table.header);
+               this.RESULTCreateLogin("idTopLogin", oResult.table.header);
             }
             else if(sQueryName === "poll_list") {
                this.RESULTCreatePollList("idPollList", oResult);
@@ -332,17 +367,12 @@ export class CPage {
             else if(sQueryName === "poll_links") {
                this.RESULTCreatePollOverviewLinks("idPollOverview", oResult);
             }
+            else if(sQueryName === "find_voter") {
+               this.RESULTCreateFindVoter("idFindVoter", oResult);
+            }
             /*
             else if(sQueryName === "poll_question_list") {
                this.RESULTCreateQuestionPanel("idPollQuestionList", oResult);
-            }
-            else if(sQueryName === "poll_answer") {
-               this.RESULTCreateVote("idPollQuestionList", oResult);
-               this.QUERYGetNextQuestion();
-            }
-            else if(sQueryName === "poll_answer_count") {
-               this.RESULTCreateVoteCount("idPollQuestionCount", oResult);
-               this.QUERYGetNextQuestion();
             }
             */
          }  break;
@@ -452,38 +482,7 @@ export class CPage {
       request.Get("SCRIPT_Run", { file: "PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
    }
 
-   /**
-    * Get vote options for question in poll. query = poll_answer
-    */
-   QUERYGetNextQuestion() {
-      let iQuestion;
-      for(let i = 0; i < this.m_aQuestion.length; i++) {
-         let a = this.m_aQuestion[ i ];
-         if(a[ 1 ] === false) {
-            iQuestion = a[ 0 ];
-            a[ 1 ] = true;
-            a[ 2 ] = this.QUESTION_STATE.WAITING_FOR_RESULT;
-            break;
-         }
-      }
 
-      if(iQuestion !== undefined) {
-         let request = this.app.request;
-         let oQuery = new CQuery({
-            conditions: [ { table: "TPollQuestion1", id: "PollQuestionK", value: iQuestion } ]
-         });
-         let sXml = <string>oQuery.CONDITIONGetXml();
-
-         let sQuery = "poll_answer";
-         if( this.view_mode === "count" ) sQuery = "poll_answer_count";
-
-         let oCommand = { command: "add_condition_to_query get_result", delete: 1, query: sQuery, set: "vote", count: 50, format: 1, start: 0 };
-         request.Get("SCRIPT_Run", { file: "PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
-      }
-   }
-
-
-   // #region LOGIN
    /****************************************************************** LOGIN
     * Create login section
     * @param eRoot
@@ -492,8 +491,9 @@ export class CPage {
    RESULTCreateLogin(eRoot, aHeader) {
       if(typeof eRoot === "string") eRoot = document.getElementById(eRoot);
 
-      let TDLogin = new CTableData({});
-      CPage.ReadColumnInformationFromHeader(TDLogin, aHeader, (iIndex, oColumn, oTD) => {
+      let TDVoter = new CTableData({});
+      this.m_oTDVoter = TDVoter;
+      CPage.ReadColumnInformationFromHeader(TDVoter, aHeader, (iIndex, oColumn, oTD) => {
          if(oColumn.key === 1) {
             oTD.COLUMNSetPropertyValue(iIndex, "position.hide", true);
          }
@@ -503,18 +503,20 @@ export class CPage {
          }
       });
 
-      TDLogin.ROWAppend(1);
+      TDVoter.COLUMNUpdatePositionIndex( true );                               // fix position is needed if there are hidden columns
+      TDVoter.ROWAppend(1);
+      TDVoter.COLUMNSetPropertyValue("FAlias", "format.min", 3);               // alias need at least three characters
 
       let oStyle = {
          class_section: "uitabletext_login", class_value_error: "error_value",
          html_value: `
 <div style='border-bottom: 1px dotted var(--gd-white); padding: 0.5em 1em;'>
-<div style='display: flex; align-items: stretch;'>
-<span data-label='1' style='padding: 0px 1em 0px 0px; text-align: right; width: 120px;'></span>
-<span data-value='1' style='flex-grow: 1; padding: 0px 2px; box-sizing: border-box; background-color: var(--gd-gray);'></span>
-</div>
-<div data-description='1'></div>
-<div class='error-message' data-error='1' style="display: none; margin-left: 120px; text-align:right;"></div>
+   <div style='display: flex; align-items: stretch;'>
+      <span data-label='1' style='padding: 0px 1em 0px 0px; text-align: right; width: 120px;'></span>
+      <span data-value='1' style='flex-grow: 1; padding: 0px 2px; box-sizing: border-box; background-color: var(--gd-gray);'></span>
+   </div>
+   <div data-description='1'></div>
+   <div class='error-message' data-error='1' style="display: none; margin-left: 120px; text-align:right;"></div>
 </div>
 `
       }
@@ -523,10 +525,10 @@ export class CPage {
          parent: eRoot,                            // container
          section: [ "title", "body", "statusbar", "footer" ],
          style: oStyle,
-         table: TDLogin,                           // source data
+         table: TDVoter,                           // source data
          name: "login",                            // name to access UI table in CTableData
-         edit: 1,                                  // endable edit
-         state: 0x0008,                            // Try to set value if property is found in element.
+         edit: 1,                                  // enable edit
+         state: enumState.SetValue,                // Try to set value if property data-value is found in cell markup.
          callback_render: (sType, _value, eElement, oColumn) => {
             if(sType === "afterCellValue") {
                let eLabel = <HTMLElement>eElement.querySelector("[data-label]");
@@ -535,30 +537,66 @@ export class CPage {
          }
       };
 
-      let TTLogin = new CUITableText(<uitabledata_construct><unknown>options);
-      TDLogin.UIAppend(TTLogin);
-      TTLogin.Render();
+      let TTVoter = new CUITableText(<uitabledata_construct><unknown>options);
+      TDVoter.UIAppend(TTVoter);
+      TTVoter.Render();
 
-      // ## GITHUB logo
-      /*
-      let eTitle = TTLogin.GetSection("title");
-      eTitle.innerHTML = `<div style="height: 80px;">
-<div style="max-width: 80px; position: absolute; top: 0px; right: 0px; opacity: 0.5;">
-<a href="https://github.com/perghosh/jsTableData" class="uk-navbar-item uk-logo" style="display: block; vertical-align: middle;">
-<svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="margin:  10px; height: 60px;"><title>GitHub repository</title><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path></svg>
-</a>
-</div></div>`;
-*/
 
       // ## Button to logon
-      let eFooter = TTLogin.GetSection("footer");
-      eFooter.innerHTML = `<div><button class='button is-white is-rounded' style='display: inline-block; margin-top: 1em; width: 200px;' disabled>Logga in</button></div>`;
+      let eFooter = TTVoter.GetSection("footer");
+      eFooter.innerHTML = `
+<div>
+   <button class='button is-white is-rounded' style='display: inline-block; margin-top: 1em; width: 200px;'>Logga in</button>
+   <div data-message style="display: none; margin: 0.5em;"></div>
+</div>`;
 
       eFooter.querySelector("button").addEventListener("click", (e) => {
-         //this.Logon();
+         let aError = TTVoter.ROWValidate(0);
+         if(Array.isArray(aError) && aError.length > 0) {
+            let sMessageError = "";
+            aError.forEach(a => { 
+               let oColumn = TDVoter.COLUMNGet( a[1] ); // [row, column, true|false, error-type]
+               if( a[3] === 'min') sMessageError += `<b>${oColumn.alias}</b> har för få tecken`;
+               if( a[3] === 'max') sMessageError += `<b>${oColumn.alias}</b> har för många tecken`;
+            })
+            if(sMessageError) {
+               this.OpenMessage( sMessageError, "warning", true );
+            }
+         }
+         else {
+            let request = this.app.request;
+            let oQuery = new CQuery({
+               conditions: [ { table: "TVoter1", id: "FAlias", value: TDVoter.CELLGetValue(0,"FAlias") } ]
+            });
+            let sXml = <string>oQuery.CONDITIONGetXml();
+            let oCommand = { command: "add_condition_to_query get_result", delete: 1, query: "find_voter", set: "vote", count: 50, format: 1, start: 0 };
+            request.Get("SCRIPT_Run", { file: "PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
+         }
+
+         //if(Array.isArray(aError) && TTLogin.ERRORGetCount() === 0) TTLogin.ERRORSet(aError);
       });
 
-      TTLogin.GetSection("body").focus();                            // set focus to body for login values
+      TTVoter.GetSection("body").focus(); // set focus to body for login values
+   }
+
+   RESULTCreateFindVoter(eRoot: string | HTMLElement, oResult: any) {
+      if(typeof eRoot === "string") eRoot = document.getElementById(eRoot);
+      let eText = eRoot;
+      let oTD = new CTableData({ id: oResult.id, name: oResult.name });
+      const aHeader = oResult.table.header;
+      CPage.ReadColumnInformationFromHeader(oTD, aHeader);
+      oTD.ReadArray(oResult.table.body, { begin: 0 });
+
+      eText.className = "";   // clear classes
+      if(oTD.ROWGetCount() === 1) {
+         eText.classList.add("has-text-success");
+         eText.innerText = "Inloggad";
+      }
+      else {
+         eText.classList.add("has-text-warning");
+         eText.innerText = "Logga in";
+         this.SendVoter();                                                    // Send voter information, try to create if not found
+      }
    }
 
    /**
@@ -757,8 +795,6 @@ export class CPage {
       });
 
       this.m_oPageState.SetCondition( aCondition );
-
-      //this.QUERYGetNextQuestion();
    }
 
    /**

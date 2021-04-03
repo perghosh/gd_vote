@@ -57,6 +57,12 @@
               <button class="delete"></button>
             </div>         
          </div>
+         <div id="idWarning" data-message style="display: none;">
+            <div class="notification is-warning">
+              <p></p>
+              <button class="delete"></button>
+            </div>         
+         </div>
       </div>
 
 <!--
@@ -74,13 +80,16 @@ div[data-section="container"]
                <li data-index="3" style="margin-top: auto;"><a data-translate="page.vote.TitleSearchField">Fältsök</a></li>
                <li data-index="4" style="margin-top: auto;"><a data-translate="page.vote.TitleSearchArea">Geografisök</a></li>
                <li data-index="5"  style="margin-top: auto;"><a data-translate="page.vote.TitleSearchPersonal">Mina intressen</a></li>
-               <li style="margin-left: auto;"><img src="res/logo_s.png" alt="Logo" /></li>
+               <li style="margin-left: auto;">
+                  <span id="idFindVoter" style="display:inline-block; margin-bottom: -1px; padding: 1em 0.5em;">voter</span>
+                  <img src="res/logo_s.png" alt="Logo" />
+               </li>
             </ul>
          </div>
 
          <div data-section="content">
             <article class="is-active notification is-primary" data-index="1" data-state="head.login">
-               <div id="idTopSection" class="content is-primary"></div>
+               <div id="idTopLogin" class="content is-primary"></div>
             </article>
             <article class="notification is-primary" data-index="2" data-state="head.hash">
             </article>
