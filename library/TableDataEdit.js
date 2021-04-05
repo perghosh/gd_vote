@@ -130,7 +130,7 @@ export var edit;
             let oEdit = this.m_aColumn[iColumn];
             console.assert(oEdit !== null, `No edit for column index ${iColumn}`);
             oEdit.SetPosition([iRow, iColumn], [iRowRelative, iColumnRelative]); // set position in table data and relative for ui control.
-            let sValue = this.data.CELLGetValue(iRow, iColumn, 4 /* All */);
+            let sValue = this.data.CELLGetValue(iRow, iColumn, 5); // 5 = enumFormat.All | enumFormat.Raw
             let oRect = eElement.getBoundingClientRect();
             //oEdit.Show(oRect, sValue);
             oEdit.Open(eElement, sValue, oRect);
@@ -571,7 +571,7 @@ export var edit;
                 if (typeof _Value !== "string")
                     _Value = "";
             }
-            let aValue = this.data.CELLGetValue(this.m_aPosition[0], this.m_aPosition[1], 4);
+            let aValue = this.data.CELLGetValue(this.m_aPosition[0], this.m_aPosition[1], 5); // 5 = enumFormat.All | enumFormat.Raw
             if (Array.isArray(aValue) && aValue.length > 1) {
                 this.m_sOldValue = aValue[1];
                 this.m_eElement.value = aValue[1];

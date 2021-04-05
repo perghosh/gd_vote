@@ -481,9 +481,18 @@ export class CUITableText {
             this.COLUMNSetRenderer(this.m_iColumnCount - 1); // Make sure that array for renders holds as many columns as columns
         const oRowRows = this.m_oRowRows;
         let aHeaderColumns = oRowRows.GetRowColumns(); // header takes columns from main row
+        // ## Pick columns that is shown from main row. Columns that is placed above or below should is not added to column header
         let a = [];
         for (let i = 0; i < aHeaderColumns.length; i++) {
-            a.push(aHeader[aHeaderColumns[i]]);
+            const iC = aHeaderColumns[i];
+            let j = aHeader.length;
+            while (--j >= 0) {
+                if (iC === aHeader[j][0]) {
+                    a.push(aHeader[j]);
+                    break;
+                }
+            }
+            //a.push( aHeader[ aHeaderColumns[i] ] );
         }
         aHeader = a;
         this.render_header(aHeader);
@@ -791,7 +800,7 @@ export class CUITableText {
             _Row = [_Row];
         for (let i = 0; i < _Row.length; i++) {
             const iRow = _Row[i];
-            let aRow = this.data.ROWGet(iRow, true);
+            let aRow = this.data.ROWGet(iRow);
             aRow.forEach((_Value, iIndex) => {
                 let oColumn = this.data.COLUMNGet(iIndex, false, true);
                 let _result = CTableData.ValidateValue(_Value, oColumn);
@@ -1145,7 +1154,7 @@ export class CUITableText {
                 const iTo = aColumn.length;
                 for (let i = 0; i < iTo; i++) {
                     //aColumn.forEach(iC => { 
-                    const iC = aColumn[i]; // index to column in table data
+                    const iC = this._column_in_ui(aColumn[i]); // index to column in table data
                     let e = this.ELEMENTGetCellValue(eColumn); // get cell value element
                     let sValue = aRow[iC]; // value for active cell
                     const oColumn = this.data.COLUMNGet(this._column_in_data(i), undefined, true);

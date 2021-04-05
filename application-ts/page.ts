@@ -8,11 +8,13 @@
 |Name|Description
 |:-|:-|
 
+| SendVote | Send vote to server to register vote for user |
 | SendVoter | Create new voter for collected information when user tried to logon. |
 | SetActivePoll | Calling this method triggers a chain of operations that will display needed information about active poll |
 | OpenMessage | Show message to user |
 | ProcessResponse | Process responses from server |
 | QUERYGetLogin | Get login information for voter. query = `login` |
+| QUERYGetPollList | Get active polls. query = poll_list |
 | QUERYGetPollOverview | Get information about selected poll. query = poll_overview. query = `poll_overview` |
 | QUERYGetPollLinks | Get links for poll. Query used is `poll_links` |
 | RESULTCreateLogin | Create login section |
@@ -49,16 +51,23 @@ namespace details {
 
 
 export class CPage {
+   m_callAction: ((sMessage: string) => void);// callback array for action hooks
    m_oApplication: CApplication;
-   m_iActivePoll: number;        // active poll
-   m_iActivePollOld: number;     // old poll index used when server respons
    m_oElement: { [key_name: string]: HTMLElement };
    m_aQuestion: [number,boolean,number, CTableData][];
    m_aPageState: CPageState[]; 
    m_oPageState: CPageState;        // current page state that is being processed
-   m_oTDVoter: CTableData;           // User data for voter
+   /**
+    * active poll information
+    * @type {number} m_oPoll.poll Key for selected poll
+    * @type {number} m_oPoll.vote Key for vote that voter just has voted for (temporary storage when vote is sent to server)
+    * @type {number} m_oPoll.count number of votes found for selected poll and voter
+    */
+   m_oPoll: { poll: number, vote: number, count: number };
+   m_oTDVoter: CTableData;          // User data for voter
    m_sViewMode: string;             // view mode page is in
-   m_aVoteHistory: number[];
+   m_aVoter: [number,string,string];// key, alias and name for current voter
+   m_aVoteHistory: number[];        // Local vote history on computer, this is to avoid abuse but is only for the current browser
    QUESTION_STATE: any;
 
    get app() { return this.m_oApplication; }                         // get application object
@@ -74,10 +83,12 @@ export class CPage {
 
    constructor(oApplication) {
       this.m_oApplication = oApplication; // application object
-      this.m_iActivePoll = -1;            // active poll id shown in page. This is the key to post i TPoll
+      //this.m_iActivePoll = -1;            // active poll id shown in page. This is the key to post i TPoll
       this.m_aQuestion = [];              // [iKey,bResult,iState,CTableData] iKey(0) = key to question, bResult(1) = result is beeing proccesed, iState(2) = state question is in, CTableData(3) = table data object for question
                                           // iState = check QUESTION_STATE
 
+
+      this.m_oPoll = { poll: -1, vote: -1, count: 0 };
       this.m_sViewMode = "vote";          // In what mode selected poll is. "vote" = enable voting for voter, "count" = view vote count for selected poll
 
       this.m_aPageState = [
@@ -91,18 +102,22 @@ export class CPage {
          "warning": document.getElementById("idWarning")
       };
 
+      this.m_aVoter = [-1,"",""];         // no voter (-1)
       this.m_aVoteHistory = [];
       this.HISTORYSerialize(false);
 
       this.QUESTION_STATE = { NO_RESULT: 0, WAITING_FOR_RESULT: 1, RESULT_DELIVERED: 2, VOTE_READY_TO_SEND: 3 };
    }
 
+   get poll() { return this.m_oPoll; }
    get view_mode() { return this.m_sViewMode; }
    set view_mode( sMode ) {                                          console.assert( sMode === "vote" || sMode === "count", "Invalid view mode: " + sMode );
       this.m_sViewMode = sMode; 
    }
 
-   GetActivePoll() { return this.m_iActivePoll; }
+   set voter( aVoter: [number,string,string] ) { this.m_aVoter = aVoter; }
+
+   GetActivePoll() { return this.poll.poll; }
 
    /**
     * 
@@ -113,19 +128,27 @@ export class CPage {
       this.CloseQuestions();
 
       if( typeof iActivePoll === "number" ) {
-         this.m_iActivePoll = iActivePoll;
+         this.poll.poll = iActivePoll;
          if( iActivePoll <= 0 ) return;
       }
 
-      this.QUERYGetPollOverview(this.m_iActivePoll, sName);
+      this.QUERYGetPollOverview(this.poll.poll, sName);
 
-      const aCondition: [details.condition][] = [[ { ready: false, table: "TPollQuestion1", id: "PollK", value: this.m_iActivePoll, simple: sName } ]];
+      const aCondition: [details.condition][] = [[ { ready: false, table: "TPollQuestion1", id: "PollK", value: this.poll.poll, simple: sName } ]];
       if( !this.m_oPageState ) this.SetActiveState( "body." + this.view_mode, undefined, aCondition );
       else {
          this.m_oPageState.SetActive( aCondition );
       }
 
       this.WalkNextState();
+   }
+
+   /**
+    * Set callback that gets notified when important operations are taken place in page object
+    * @param {string) => void)} callback [description]
+    */
+   SetCallback( callback: ((sMessage: string) => void) ) {
+      this.m_callAction = callback;
    }
 
    /**
@@ -157,6 +180,10 @@ export class CPage {
       oPageState.SetActive( aCondition );
       this.m_oPageState = oPageState;
       //this.WalkNextState();
+   }
+
+   CallOwner( sMessage ) {
+      if( this.m_callAction ) this.m_callAction( sMessage );
    }
 
    /**
@@ -251,7 +278,7 @@ export class CPage {
       if( sMessage === undefined ) return;
       sType = sType || "message";
       let e = this.m_oElement[sType];
-      e = e.querySelector("p");
+      e = e.querySelector("p, pre");
       if( bHtml === true ) e.innerHTML = sMessage;
       else e.textContent = sMessage;
       (<HTMLElement>e.closest("[data-message]")).style.display = "block";
@@ -276,8 +303,13 @@ export class CPage {
          });
       });
 
+      let aHeader = [ { name: "PollK", value: this.GetActivePoll() } ];
+      if(this.m_aVoter[ 0 ] !== -1) {
+         aHeader.push( { name: "VoterK", value: this.m_aVoter[ 0 ] });;
+      }
+
       let oQuery = new CQuery({
-         header: [ { name: "PollK", value: this.GetActivePoll() } ],
+         header: aHeader,
          values: aValue
       });
 
@@ -292,7 +324,7 @@ export class CPage {
       let oCommand = { command: "add_rows", query: "poll_vote", set: "vote", table: "TPollVote1" };
       let request = this.app.request;
       request.Get("SCRIPT_Run", { file: "PAGE_result_edit.lua", json: request.GetJson(oCommand) }, sXml);
-      this.m_iActivePollOld = this.m_iActivePoll;                             // keep poll index for later when response from server is returned
+      this.poll.vote = this.poll.poll;                      // keep poll index for later when response from server is returned
    }
 
    /**
@@ -385,13 +417,14 @@ export class CPage {
                const sQueryName = oResult.name;
                if(sQueryName === "poll_vote") {
                   this.OpenMessage("Din röst har blivit registrerad!")
-                  if(typeof this.m_iActivePollOld === "number") {
-                     this.m_aVoteHistory.push(this.m_iActivePollOld);
+                  if(this.poll.vote > 0) {
+                     this.m_aVoteHistory.push(this.poll.vote);
                      this.HISTORYSerialize( true );
                   }
-                  this.m_iActivePollOld = null;
-                  //this.view_mode = "count";
-                  //this.SetActivePoll();
+                  this.poll.vote = -1;
+               }
+               else if(sQueryName === "login") {
+                  this.CallOwner("insert-voter");
                }
             }
             break;
@@ -471,7 +504,7 @@ export class CPage {
     * Get questions for selected poll. query = poll_question_list
     */
    QUERYGetPollQuestions(iPoll) {
-      iPoll = iPoll || this.m_iActivePoll;
+      iPoll = iPoll || this.poll.poll; // this.m_iActivePoll;
       let request = this.app.request;
       let oQuery = new CQuery({
          conditions: [ { table: "TPoll1", id: "PollK", value: iPoll } ]
@@ -503,10 +536,16 @@ export class CPage {
          }
       });
 
+      TDVoter.COLUMNSetPropertyValue( true , "edit.element", 1 );              // Set element property to 1 for edit item in column to mark that there is an existing element that is used for column value.
+
       TDVoter.COLUMNUpdatePositionIndex( true );                               // fix position is needed if there are hidden columns
       TDVoter.ROWAppend(1);
       TDVoter.COLUMNSetPropertyValue("FAlias", "format.min", 3);               // alias need at least three characters
+      TDVoter.COLUMNSetPropertyValue("FAlias", "format.max", 25);              // alias need at least three characters
+      TDVoter.COLUMNSetPropertyValue("FName", "format.max", 25);
+      TDVoter.COLUMNSetPropertyValue("FMail", "format.max", 50);
 
+/*
       let oStyle = {
          class_section: "uitabletext_login", class_value_error: "error_value",
          html_value: `
@@ -520,6 +559,26 @@ export class CPage {
 </div>
 `
       }
+*/
+
+      let oStyle = {
+         class_section: "uitabletext_login", class_value_error: "error_value",
+         html_value: `
+<div class="field is-horizontal mb-1">
+  <div class="field-label is-normal">
+    <label data-label="1" class="label">Normal label</label>
+  </div>
+  <div class="field-body">
+    <div class="field">
+      <div class="control">
+        <input data-value="1" class="input" type="text">
+      </div>
+    </div>
+  </div>
+</div>
+`
+      }
+
 
       let options = {
          parent: eRoot,                            // container
@@ -528,16 +587,22 @@ export class CPage {
          table: TDVoter,                           // source data
          name: "login",                            // name to access UI table in CTableData
          edit: 1,                                  // enable edit
-         state: enumState.SetValue,                // Try to set value if property data-value is found in cell markup.
+         state: (enumState.SetValue | enumState.HtmlValue),                // Try to set value if property data-value is found in cell markup.
          callback_render: (sType, _value, eElement, oColumn) => {
             if(sType === "afterCellValue") {
                let eLabel = <HTMLElement>eElement.querySelector("[data-label]");
                eLabel.innerText = oColumn.alias;
             }
+            //else if( sType === "askCellValue" ) return false;
          }
       };
 
       let TTVoter = new CUITableText(<uitabledata_construct><unknown>options);
+
+      TTVoter.edits.GetEdit(1).SetMoveKey( [9,13,38,40] );
+      TTVoter.edits.GetEdit(2).SetMoveKey( [9,13,38,40] );
+      TTVoter.edits.GetEdit(3).SetMoveKey( [9,13,38,40] );
+
       TDVoter.UIAppend(TTVoter);
       TTVoter.Render();
 
@@ -546,7 +611,7 @@ export class CPage {
       let eFooter = TTVoter.GetSection("footer");
       eFooter.innerHTML = `
 <div>
-   <button class='button is-white is-rounded' style='display: inline-block; margin-top: 1em; width: 200px;'>Logga in</button>
+   <button class='button is-rounded' style='display: inline-block; margin-top: 1em; width: 200px;'>Logga in</button>
    <div data-message style="display: none; margin: 0.5em;"></div>
 </div>`;
 
@@ -589,8 +654,14 @@ export class CPage {
 
       eText.className = "";   // clear classes
       if(oTD.ROWGetCount() === 1) {
+         // Get key and name for voter
+         const iVoterK = <number>oTD.CELLGetValue( 0, "VoterK" );
+         const sAlias = <string>oTD.CELLGetValue( 0, "FAlias" );
+         const sName = <string>oTD.CELLGetValue( 0, "FName" );
+         this.voter = [iVoterK, sAlias, sName ];
          eText.classList.add("has-text-success");
-         eText.innerText = "Inloggad";
+         eText.innerText = `Inloggad (${sAlias})`;
+         this.CallOwner("select-voter");
       }
       else {
          eText.classList.add("has-text-warning");
@@ -620,6 +691,8 @@ export class CPage {
          let eList = <HTMLElement>document.getElementById("idPollList");
          let eSelect = <HTMLElement>document.createElement("select");
          let eOption = <HTMLOptionElement>document.createElement("option");
+         eOption.innerText = "Välj omröstning här!";
+         eOption.style.fontStyle = "italic";
          eSelect.appendChild(eOption);
          eSelect.className = "has-text-weight-bold";
          aData.forEach((a, i) => {
@@ -668,12 +741,17 @@ export class CPage {
 
 
       let oTD = new CTableData({ id: oResult.id, name: oResult.name });
+      CPage.ReadColumnInformationFromHeader(oTD, oResult.table.header);
+
       oTD.ReadArray(oResult.table.body, { begin: 0 });
 
       const sName = <string>oTD.CELLGetValue(0, 1);         // Poll name
       const sDescription = <string>oTD.CELLGetValue(0, 2);  // Poll description
       const iQuestionCount = <number>oTD.CELLGetValue(0, 3);// Number of questions in poll
-      const iLinkCount = <number>oTD.CELLGetValue(0, 4);    // Links assocated with poll
+      const iLinkCount = <number>oTD.CELLGetValue(0, "CountLink");// Links associated with poll
+      const iVoteCount = <number>oTD.CELLGetValue(0, "MyCount");// if registered voter has voted in this poll
+      if( typeof iVoteCount === "number" ) this.poll.count = iVoteCount;
+      else this.poll.count = 0;
 
       if(iQuestionCount > 0) {
          // ## Generate title for poll
@@ -697,6 +775,7 @@ export class CPage {
       if(typeof eRoot === "string") eRoot = document.getElementById(eRoot);
 
       let oTD = new CTableData({ id: oResult.id, name: oResult.name });
+      CPage.ReadColumnInformationFromHeader(oTD, oResult.table.header);
       oTD.ReadArray(oResult.table.body, { begin: 0 });
 
       let eLink = <HTMLElement>eRoot.querySelector('[data-section="link"]');
@@ -752,7 +831,7 @@ export class CPage {
          eVote.dataset.section = "vote";
          eRoot.appendChild(eVote);
 
-         if(this.HISTORYFindPoll(this.GetActivePoll()) === false) {
+         if(this.HISTORYFindPoll(this.GetActivePoll()) === false && this.poll.count < 1) {
             if(eVote) {
                eVote.innerHTML = `<button class='button is-white is-rounded is-primary is-large' style='width: 300px;'>RÖSTA</button>`;
             }
@@ -771,6 +850,7 @@ export class CPage {
 
 
       let oTD = new CTableData({ id: oResult.id, name: oResult.name });
+      CPage.ReadColumnInformationFromHeader(oTD, oResult.table.header);
       oTD.ReadArray(oResult.table.body, { begin: 0 });
 
       let aBody = oTD.GetData()[ 0 ];

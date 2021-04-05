@@ -339,8 +339,9 @@ export declare class CTableData {
     COLUMNGet(_Index: number | string, bNull?: boolean, bRaw?: boolean): details.column;
     /**
      * Update matching index for objects that uses table data based on property values that marks columns as hidden or disabled
+     * @param {boolean} [bInternal] If true update m_aColumnIndex to set the column order when order do not match the physical order for columnd
      */
-    COLUMNUpdatePositionIndex(bInternal: boolean): void;
+    COLUMNUpdatePositionIndex(bInternal?: boolean): void;
     /**
      * Count columns and return how many.
      * This can also count column with properties, like how many key columns there are.

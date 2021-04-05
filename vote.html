@@ -44,10 +44,10 @@
 
    <div class="container">
 
-      <div data-section="information">
+      <div id="idUserMessage" data-section="information">
          <div id="idError" data-message style="display: none;">
             <div class="notification is-danger">
-              <p></p>
+              <pre></pre>
               <button class="delete"></button>
             </div>         
          </div>
@@ -72,7 +72,7 @@ div[data-section="container"]
    div[data-section="content"]
       [data-index="1"] - [data-index="5"]
 -->
-      <div data-section="container">
+      <div id="idTabSearch" data-section="container" data-page-type="search">
          <div data-section="tab" class="tabs is-small" style="height: 5em;">
             <ul>
                <li data-index="1" class="is-active" style="margin-top: auto;"><a data-translate="page.vote.TitleLogin">Inloggning</a></li>
@@ -81,23 +81,27 @@ div[data-section="container"]
                <li data-index="4" style="margin-top: auto;"><a data-translate="page.vote.TitleSearchArea">Geografisök</a></li>
                <li data-index="5"  style="margin-top: auto;"><a data-translate="page.vote.TitleSearchPersonal">Mina intressen</a></li>
                <li style="margin-left: auto;">
-                  <span id="idFindVoter" style="display:inline-block; margin-bottom: -1px; padding: 1em 0.5em;">voter</span>
+                  <span id="idFindVoter" style="display:inline-block; margin-bottom: -1px; padding: 1em 0.5em;"></span>
                   <img src="res/logo_s.png" alt="Logo" />
                </li>
             </ul>
          </div>
 
-         <div data-section="content">
-            <article class="is-active notification is-primary" data-index="1" data-state="head.login">
+         <div class="box" data-section="content" style="margin-bottom: 1.5em;">
+            <article class="is-active is-primary" data-index="1" data-state="head.login">
                <div id="idTopLogin" class="content is-primary"></div>
             </article>
-            <article class="notification is-primary" data-index="2" data-state="head.hash">
+            <article class="is-primary" data-index="2" data-state="head.hash">
+               <div id="idSearchHash" class="content is-primary is-size-2">Sök på hashtag ord</div>
             </article>
-            <article class="notification is-primary" data-index="3" data-state="head.field">
+            <article class="is-primary" data-index="3" data-state="head.field">
+               <div id="idSearchField" class="content is-primary is-size-2">Sök på fält</div>
             </article>
-            <article class="notification is-primary" data-index="4" data-state="head.area">
+            <article class="is-primary" data-index="4" data-state="head.area">
+               <div id="idSearchArea" class="content is-primary is-size-2">Sök på område</div>
             </article>
-            <article class="notification is-primary" data-index="5" data-state="head.personal">
+            <article class="is-primary" data-index="5" data-state="head.personal">
+               <div id="idSearchPersonal" class="content is-primary is-size-2">Sök på personliga intressen</div>
             </article>
          </div>
       </div>
@@ -129,7 +133,7 @@ div[data-section="container"]
       [data-index="1"]
       [data-index="2"]
 -->
-      <div data-section="container">
+      <div data-section="container" data-page-type="vote">
          <div data-section="tab" class="tabs is-small" style="height: 5em;">
             <ul>
                <li class="is-active" data-index="1"><a data-translate="page.vote.vote">Rösta</a></li>
@@ -150,7 +154,6 @@ div[data-section="container"]
             <article id="idPollVote" class="box is-active" data-index="1" data-state="body.vote">
             </article>
             <article id="idPollCount" class="box" data-index="2" data-state="body.count">
-               <div>delete this</div
             </article>
          </div>
       </div>
@@ -159,10 +162,22 @@ div[data-section="container"]
 
    <script>
       function PAGE_Setup() {
-
-
          window.app = new CApplication();
          window.app.Initialize();
+         window.app.page.SetCallback( PAGE_Callback );
+      }
+
+      function PAGE_Callback(sMessage) {
+         if( sMessage === "select-voter") {
+            let eTab = document.getElementById("idTabSearch").querySelector('[data-index="1"]');
+            eTab.remove();
+            eTab = document.getElementById("idTabSearch").querySelector('[data-index="5"]');
+            eTab.click();
+         }
+         else if( sMessage === "insert-voter" ) {
+            window.app.page.OpenMessage("Användaren är registrerad och kan rösta efter att ha loggat in igen!");
+         }
+
       }
 
       /*
@@ -174,8 +189,10 @@ div[data-section="container"]
          eTabs.addEventListener("click", e => {
             let iTabIndex;
             let eTab = e.srcElement;
-            let eContent = eTab.closest('[data-section="container"]').querySelector('[data-section="content"]'); // get content container, content holds information related to tab
+            let eContainer = eTab.closest('[data-section="container"]');
+            let eContent = eContainer.querySelector('[data-section="content"]'); // get content container, content holds information related to tab
             if( eContent === null ) return;
+
             if(eTab.tagName === "A" || eTab.tagName === "LI") { // found tab ?
                let eHeader = eTab.closest(".tabs");
                eHeader.querySelectorAll(".is-active").forEach(e => { e.classList.remove("is-active"); }); // remove all active tabs
@@ -185,7 +202,8 @@ div[data-section="container"]
                eTab.classList.add("is-active" );
                iTabIndex = parseInt( eTab.dataset.index, 10 );
             }
-                                                                               console.assert( typeof iTabIndex === "number", "no number for page index, something is wrong in markup" );
+            else return;
+            console.assert( typeof iTabIndex === "number", "no number for page index, something is wrong in markup" );
             
             eContent.querySelectorAll(".is-active").forEach(e => { e.classList.remove("is-active"); }); // close all content pages
 
@@ -193,15 +211,27 @@ div[data-section="container"]
             eContent = eContent.querySelector(`[data-index="${iTabIndex}"]`);
             eContent.classList.add("is-active");
 
-            const oPage = window.app.page;
-            oPage.SetActiveState( eContent.dataset.state, eContent );
-            if( oPage.GetActivePoll() > 0 ) oPage.SetActivePoll( oPage.GetActivePoll() );
+            // ## Process page operation based on what tab that is selected
+            if(eContainer.dataset.pageType === "search") {
+
+            }
+            else if(eContainer.dataset.pageType === "vote") {
+               const oPage = window.app.page;
+               oPage.SetActiveState(eContent.dataset.state, eContent);
+               if(oPage.GetActivePoll() > 0) oPage.SetActivePoll(oPage.GetActivePoll());
+            }
          });
 
       });
 
-      let eButtonCloseMessage = document.getElementById("idMessage").querySelector("button");
-      eButtonCloseMessage.addEventListener("click", e => { document.getElementById("idMessage").style.display = "none"; });
+      // handle close button in message section
+      let eUserMessage = document.getElementById("idUserMessage");
+      eUserMessage.addEventListener("click", e => { 
+         if( e.srcElement.tagName === "BUTTON") {
+            let eMessage = e.srcElement.closest("[data-message]");
+            eMessage.style.display = "none"; 
+         }
+      });
 
       /*
        * ## Configure special elements in page
@@ -251,7 +281,7 @@ div[data-section="container"]
       window.onerror = function(sMessage, sUrl, iLine) {
          if(typeof sMessage === "string") {
             sMessage += "\n" + sUrl + "\nLine: " + iLine;
-            document.getElementById("idError").innerText = sMessage;
+            window.app.page.OpenMessage(sMessage, "error");
          }
       };
 
