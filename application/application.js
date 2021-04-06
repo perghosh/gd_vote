@@ -1,9 +1,10 @@
 import { edit } from "./../library/TableDataEdit.js";
 import { CRequest } from "./../server/ServerRequest.js";
 import { CPage } from "./page.js";
-//import { CRequest } from "Request"
 export class CApplication {
-    constructor() {
+    constructor(oOptions) {
+        const o = oOptions || {};
+        this.m_callAction = o.callback_action || null;
         this.m_oEditors = edit.CEditors.GetInstance();
         // Initialize CRequest for server communication
         this.m_oRequest = new CRequest({
@@ -15,13 +16,13 @@ export class CApplication {
             //url: "http://localhost:8080/so/jq.srf?"
         });
         this.m_sAlias = "guest"; // change this based on what alias that is used
-        this.m_oPage = new CPage(this);
         this.m_sQueriesSet = "vote";
     }
     get alias() { return this.m_sAlias; }
     get request() { return this.m_oRequest; }
     get session() { return this.m_oRequest.session; }
     get page() { return this.m_oPage; }
+    set page(oPage) { this.m_oPage = oPage; }
     get queries_set() { return this.m_sQueriesSet; }
     set queries_set(s) { this.m_sQueriesSet = s; }
     /**
@@ -39,9 +40,12 @@ export class CApplication {
     /**
      * Initialize page information, user is verified and it is tome to collect information needed to render page markup
      */
-    InitializePage() {
-        this.page.QUERYGetLogin();
-        this.page.QUERYGetPollList();
+    InitializePage(oState) {
+        this.m_oPage = new CPage(this);
+    }
+    CallOwner(sMessage) {
+        if (this.m_callAction)
+            this.m_callAction.call(this, sMessage);
     }
     OnResponse(eSection, sMethod) {
         let aItem = eSection.getElementsByTagName('item');
@@ -71,13 +75,14 @@ export class CApplication {
             oApplication.OnResponse(eSection, sMethod);
         }
         else if (sMethod === "SYSTEM_GetUserData") {
+            oApplication.CallOwner("server-session");
             if (oApplication.queries_set) {
                 let request = oApplication.request;
                 let oCommand = { command: "load_if_not_found", set: "vote" };
                 request.Get("SCRIPT_Run", { file: "queriesset.lua", json: request.GetJson(oCommand) });
             }
             else {
-                oApplication.InitializePage();
+                // oApplication.InitializePage();
             }
         }
     }

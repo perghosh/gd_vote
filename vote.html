@@ -162,12 +162,16 @@ div[data-section="container"]
 
    <script>
       function PAGE_Setup() {
-         window.app = new CApplication();
+         window.app = new CApplication({ callback_action: PAGE_Callback });
          window.app.Initialize();
-         window.app.page.SetCallback( PAGE_Callback );
+         //window.app.page.SetCallback( PAGE_Callback );
       }
 
       function PAGE_Callback(sMessage) {
+         if( sMessage === "load" ) {
+            this.QUERYGetLogin();
+            this.QUERYGetPollList();
+         }
          if( sMessage === "select-voter") {
             let eTab = document.getElementById("idTabSearch").querySelector('[data-index="1"]');
             eTab.remove();
@@ -176,6 +180,17 @@ div[data-section="container"]
          }
          else if( sMessage === "insert-voter" ) {
             window.app.page.OpenMessage("Användaren är registrerad och kan rösta efter att ha loggat in igen!");
+         }
+         else if( sMessage === "ready-poll-list" ) {
+            if(this.state.read_url === true) {                                // check url for poll parameter
+               delete this.state.read_url;
+               this.URLReadSelectedPoll();
+            }
+         }
+         else if(sMessage === "server-session") {
+            if( !this.page) {
+               this.m_oPage = new CPage(this, {callback_action: PAGE_Callback, read_url: true});
+            }
          }
 
       }

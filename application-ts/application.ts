@@ -3,16 +3,25 @@ import { edit  } from "./../library/TableDataEdit.js";
 import { CRequest, EventRequest } from "./../server/ServerRequest.js";
 import { CPage } from "./page.js";
 
-//import { CRequest } from "Request"
+namespace details {
+   export type application_construct = {
+      callback_action?: ((sMessage: string) => void);
+      state?: { [key_name: string]: string|number|boolean } // state items for page
+   }
+}
+
 
 export class CApplication {
+   m_callAction: ((sMessage: string) => void);// callback array for action hooks
    m_sAlias: string;
    m_oPage: CPage;
    m_sQueriesSet: string;
    m_oEditors: edit.CEditors;
    m_oRequest: CRequest;
 
-   constructor() {
+   constructor( oOptions?: details.application_construct ) {
+      const o = oOptions || {};
+      this.m_callAction = o.callback_action || null;
       this.m_oEditors = <edit.CEditors>edit.CEditors.GetInstance();
       // Initialize CRequest for server communication
       this.m_oRequest = new CRequest({
@@ -25,7 +34,6 @@ export class CApplication {
       });
 
       this.m_sAlias = "guest";                                                  // change this based on what alias that is used
-      this.m_oPage = new CPage(this);
       this.m_sQueriesSet = "vote";
    }
 
@@ -33,6 +41,7 @@ export class CApplication {
    get request() { return this.m_oRequest; }
    get session() { return this.m_oRequest.session; }
    get page() { return this.m_oPage; }
+   set page( oPage: CPage ) { this.m_oPage = oPage; }
    get queries_set() { return this.m_sQueriesSet; }
    set queries_set(s) { this.m_sQueriesSet = s; }
 
@@ -53,9 +62,12 @@ export class CApplication {
    /**
     * Initialize page information, user is verified and it is tome to collect information needed to render page markup
     */
-   InitializePage() {
-      this.page.QUERYGetLogin();
-      this.page.QUERYGetPollList();
+   InitializePage( oState?: { [key_name: string]: string|number|boolean } ) {
+      this.m_oPage = new CPage(this);
+   }
+
+   CallOwner( sMessage ) {
+      if( this.m_callAction ) this.m_callAction.call( this, sMessage );
    }
 
    OnResponse(eSection, sMethod) {
@@ -89,13 +101,14 @@ export class CApplication {
          oApplication.OnResponse(eSection, sMethod);
       }
       else if(sMethod === "SYSTEM_GetUserData") {
+         oApplication.CallOwner("server-session");
          if(oApplication.queries_set) {
             let request = oApplication.request;
             let oCommand = { command: "load_if_not_found", set: "vote" };
             request.Get("SCRIPT_Run", { file: "queriesset.lua", json: request.GetJson(oCommand) });
          }
          else {
-            oApplication.InitializePage();
+            // oApplication.InitializePage();
          }
       }
    }

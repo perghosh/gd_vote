@@ -20,7 +20,9 @@
 | RESULTCreateLogin | Create login section |
 | RESULTCreateFindVoter | Result from finding voter, this is called if user tries to login |
 | RESULTCreatePollOverview | Process result from  `poll_overview`|
-|||
+| RESULTCreatePollOverviewLinks | Process result from `poll_links` and render these for user |
+| RESULTCreateQuestionPanel | Create panels for each question that belongs to current selected poll. Like containers for selectable votes |
+| RESULTCreateVoteCount | Create markup showing vote count on each answer for poll question |
 |||
 |||
 */
@@ -41,6 +43,11 @@ namespace details {
 
    export type condition = { ready?: boolean, table: string, id: string, value: string|number, simple?: string, operator?: number }
 
+   export type page_construct = {
+      callback_action?: ((sMessage: string) => void);
+      state?: { [key_name: string]: string|number|boolean } // state items for page
+   }
+
    export type state_construct = {
       container: HTMLElement,// container element for result markup
       name: string,        // name in page section
@@ -54,7 +61,6 @@ export class CPage {
    m_callAction: ((sMessage: string) => void);// callback array for action hooks
    m_oApplication: CApplication;
    m_oElement: { [key_name: string]: HTMLElement };
-   m_aQuestion: [number,boolean,number, CTableData][];
    m_aPageState: CPageState[]; 
    m_oPageState: CPageState;        // current page state that is being processed
    /**
@@ -64,13 +70,11 @@ export class CPage {
     * @type {number} m_oPoll.count number of votes found for selected poll and voter
     */
    m_oPoll: { poll: number, vote: number, count: number };
+   m_oState: { [key_name: string]: string|number|boolean }; // States for page, may be used for outside actions
    m_oTDVoter: CTableData;          // User data for voter
    m_sViewMode: string;             // view mode page is in
    m_aVoter: [number,string,string];// key, alias and name for current voter
    m_aVoteHistory: number[];        // Local vote history on computer, this is to avoid abuse but is only for the current browser
-   QUESTION_STATE: any;
-
-   get app() { return this.m_oApplication; }                         // get application object
 
    // ## One single poll can have one or more questions. Each questions has one or more answers. 
    // ## When poll is selected page gets information about each question in poll and render information 
@@ -81,14 +85,16 @@ export class CPage {
    // RESULT_DELIVERED = Result about question is returned from server
    // VOTE_READY_TO_SEND = Vote is ready to send to server, voter has selected answers
 
-   constructor(oApplication) {
-      this.m_oApplication = oApplication; // application object
-      //this.m_iActivePoll = -1;            // active poll id shown in page. This is the key to post i TPoll
-      this.m_aQuestion = [];              // [iKey,bResult,iState,CTableData] iKey(0) = key to question, bResult(1) = result is beeing proccesed, iState(2) = state question is in, CTableData(3) = table data object for question
-                                          // iState = check QUESTION_STATE
+   constructor(oApplication, oOptions?: details.page_construct) {
+      const o = oOptions || {};
 
+      this.m_oApplication = oApplication; // application object
+      oApplication.page = this;
+   
+      this.m_callAction = o.callback_action || null;
 
       this.m_oPoll = { poll: -1, vote: -1, count: 0 };
+      this.m_oState = o.state || {};
       this.m_sViewMode = "vote";          // In what mode selected poll is. "vote" = enable voting for voter, "count" = view vote count for selected poll
 
       this.m_aPageState = [
@@ -99,17 +105,18 @@ export class CPage {
       this.m_oElement = {
          "error": document.getElementById("idError"),
          "message": document.getElementById("idMessage"),
+         "poll_list": document.getElementById("idPollList"),
          "warning": document.getElementById("idWarning")
       };
 
       this.m_aVoter = [-1,"",""];         // no voter (-1)
       this.m_aVoteHistory = [];
       this.HISTORYSerialize(false);
-
-      this.QUESTION_STATE = { NO_RESULT: 0, WAITING_FOR_RESULT: 1, RESULT_DELIVERED: 2, VOTE_READY_TO_SEND: 3 };
    }
 
+   get app() { return this.m_oApplication; }                                   // get application object
    get poll() { return this.m_oPoll; }
+   get state() { return this.m_oState; }                                       // get state object
    get view_mode() { return this.m_sViewMode; }
    set view_mode( sMode ) {                                          console.assert( sMode === "vote" || sMode === "count", "Invalid view mode: " + sMode );
       this.m_sViewMode = sMode; 
@@ -120,11 +127,12 @@ export class CPage {
    GetActivePoll() { return this.poll.poll; }
 
    /**
-    * 
-    * @param iActivePoll
-    * @param sName
+    * Activate poll with number
+    * @param iActivePoll key to active poll  
+    * @param {string} [sName] Name for active poll
+    * @param {boolean} [bSelect] If page should be updated based on poll. Select poll in dropdown if found
     */
-   SetActivePoll(iActivePoll?: number, sName?: string) {
+   SetActivePoll(iActivePoll?: number, sName?: string, bSelect?: boolean ) {
       this.CloseQuestions();
 
       if( typeof iActivePoll === "number" ) {
@@ -138,6 +146,12 @@ export class CPage {
       if( !this.m_oPageState ) this.SetActiveState( "body." + this.view_mode, undefined, aCondition );
       else {
          this.m_oPageState.SetActive( aCondition );
+      }
+
+      if(bSelect === true ) {                                                 // Update dependent items in page base on poll key
+         let eList = this.m_oElement.poll_list;
+         let eSelect = eList.querySelector("select");
+         eSelect.value = iActivePoll.toString();
       }
 
       this.WalkNextState();
@@ -183,7 +197,7 @@ export class CPage {
    }
 
    CallOwner( sMessage ) {
-      if( this.m_callAction ) this.m_callAction( sMessage );
+      if( this.m_callAction ) this.m_callAction.call( this, sMessage );
    }
 
    /**
@@ -239,7 +253,6 @@ export class CPage {
    }
 
    CloseQuestions() {
-      this.m_aQuestion = [];                                // clear state and items with poll informaiton
       document.getElementById("idPollVote").innerHTML = "";
       document.getElementById("idPollCount").innerHTML = "";
       this.OpenMessage();                                   // close any open message
@@ -408,8 +421,8 @@ export class CPage {
             }
             */
          }  break;
-         case "load_if_not_found":
-            (<any>window).app.InitializePage();
+         case "load":
+            this.CallOwner("load");
             break;
          case "message":
             const sType = oResult.type;
@@ -688,7 +701,8 @@ export class CPage {
       if(aBody[ 0 ].length) {
          let aData = aBody[ 0 ];
          let aKey = aBody[ 1 ];
-         let eList = <HTMLElement>document.getElementById("idPollList");
+         let eList = this.m_oElement.poll_list; 
+         eList.innerHTML = "";
          let eSelect = <HTMLElement>document.createElement("select");
          let eOption = <HTMLOptionElement>document.createElement("option");
          eOption.innerText = "Välj omröstning här!";
@@ -719,6 +733,8 @@ export class CPage {
             }
          });
       }
+
+      this.CallOwner("ready-poll-list");
    }
 
    /**
@@ -771,6 +787,11 @@ export class CPage {
       else { eLink.style.display = "none"; }
    }
 
+   /**
+    * Process result from `poll_links` and render these for user
+    * @param {string|HTMLElement} eRoot
+    * @param {any} oResult server result with information about links
+    */
    RESULTCreatePollOverviewLinks( eRoot: string|HTMLElement, oResult?: any ) {
       if(typeof eRoot === "string") eRoot = document.getElementById(eRoot);
 
@@ -804,7 +825,7 @@ export class CPage {
    /**
     * Create panels for each question that belongs to current selected poll
     * @param {string|HTMLElement} eRoot
-    * @param oResult
+    * @param {any} oResult server result with questions for selected poll
     */
    RESULTCreateQuestionPanel(eRoot: string|HTMLElement, oResult: any) {
       if(typeof eRoot === "string") eRoot = document.getElementById(eRoot);
@@ -856,13 +877,7 @@ export class CPage {
       let aBody = oTD.GetData()[ 0 ];
       let aCondition: details.condition[] = [];
       aBody.forEach((aRow, i) => {
-         
-         this.m_aQuestion.push([ <number>aRow[ 0 ], false, this.QUESTION_STATE.NO_RESULT, null ]);
-
          // For each question in poll we add one condition to page state to return answers for that question where user are able to vote for one or more.
-         this.m_oPageState
-
-
          const iQuestion = <number>aRow[ 0 ];
          aCondition.push( { ready: false, table: "TPollQuestion1", id: "PollQuestionK", value: iQuestion} );
          let eSection = <HTMLElement>document.createElement("section");
@@ -879,6 +894,8 @@ export class CPage {
 
    /**
     * Create vote for poll question. Creates markup for possible answers to poll question
+    * @param {string|HTMLElement} eRoot
+    * @param {any} oResult server result with answers for questions in selected poll
     */
    RESULTCreateVote(eRoot: string|HTMLElement, oResult: any) {
       if(typeof eRoot === "string") eRoot = document.getElementById(eRoot);
@@ -970,6 +987,8 @@ export class CPage {
 
    /**
     * Create markup showing vote count on each answer for poll question
+    * @param {string|HTMLElement} eRoot
+    * @param {any} oResult server results for each answer to questions in selected poll
     */
    RESULTCreateVoteCount(eRoot: string|HTMLElement, oResult: any) {
       if(typeof eRoot === "string") eRoot = document.getElementById(eRoot);
@@ -1018,6 +1037,19 @@ export class CPage {
       TDVote.UIAppend(TTVote);
 
       TTVote.Render();
+   }
+
+   /**
+    * 
+    */
+   URLReadSelectedPoll() {
+      const oParams = new URLSearchParams(location.search);
+
+      if(oParams.has("poll")) {
+         const iPoll = parseInt( oParams.get("poll"), 10 );
+         if( typeof iPoll === "number" ) this.SetActivePoll( iPoll, undefined, true );
+      }
+
    }
 
 
