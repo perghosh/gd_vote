@@ -17,6 +17,7 @@
 | QUERYGetPollList | Get active polls. query = poll_list |
 | QUERYGetPollOverview | Get information about selected poll. query = poll_overview. query = `poll_overview` |
 | QUERYGetPollLinks | Get links for poll. Query used is `poll_links` |
+| QUERYGetPollHashtags | Get hashtags for poll or all poll hashtags. Query used is `poll_hashtags` |
 | RESULTCreateLogin | Create login section |
 | RESULTCreateFindVoter | Result from finding voter, this is called if user tries to login |
 | RESULTCreatePollOverview | Process result from  `poll_overview`|
@@ -98,6 +99,10 @@ export class CPage {
         }
         this.WalkNextState();
     }
+    /**
+     * Return true if voter key is found
+     */
+    IsVoter() { return this.m_aVoter[0] !== -1; }
     /**
      * Set callback that gets notified when important operations are taken place in page object
      * @param {string) => void)} callback [description]
@@ -212,10 +217,12 @@ export class CPage {
         const bReady = aTD.length === iOkCount;
         if (bUpdateVoteButton === true) {
             let e = oPageState.container.querySelector('[data-section="vote"]').querySelector("button");
-            if (bReady)
-                e.removeAttribute("disabled");
-            else
-                e.setAttribute("disabled", "");
+            if (e) { // if voter is blocked from voting the button do not exist
+                if (bReady)
+                    e.removeAttribute("disabled");
+                else
+                    e.setAttribute("disabled", "");
+            }
         }
         return bReady;
     }
@@ -226,7 +233,8 @@ export class CPage {
      * @param {boolean} [bHtml] if text is html formated
      */
     OpenMessage(sMessage, sType, bHtml) {
-        Object.values(this.m_oElement).forEach(e => { e.style.display = "none"; });
+        Object.values(this.m_oElement).forEach(e => { if (typeof e.dataset.message === "string")
+            e.style.display = "none"; });
         if (sMessage === undefined)
             return;
         sType = sType || "message";
@@ -432,6 +440,22 @@ export class CPage {
         });
         let sXml = oQuery.CONDITIONGetXml();
         let oCommand = { command: "add_condition_to_query get_result", delete: 1, query: "poll_links", set: "vote", count: 50, format: 1, start: 0 };
+        request.Get("SCRIPT_Run", { file: "PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
+    }
+    /**
+     * Return hashtags for selected poll
+     * @param {number} [iPoll] Index to selected poll
+     */
+    QUERYGetPollHashtags(iPoll) {
+        let request = this.app.request;
+        let sXml;
+        if (iPoll) {
+            let oQuery = new CQuery({
+                conditions: [{ table: "TPoll1", id: "PollK", value: iPoll }]
+            });
+            sXml = oQuery.CONDITIONGetXml();
+        }
+        let oCommand = { command: "add_condition_to_query get_result", delete: 1, query: "poll_hashtags", set: "vote", count: 100, format: 1, start: 0 };
         request.Get("SCRIPT_Run", { file: "PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
     }
     /**
@@ -663,10 +687,14 @@ export class CPage {
         const iQuestionCount = oTD.CELLGetValue(0, 3); // Number of questions in poll
         const iLinkCount = oTD.CELLGetValue(0, "CountLink"); // Links associated with poll
         const iVoteCount = oTD.CELLGetValue(0, "MyCount"); // if registered voter has voted in this poll
+        const iIpCount = oTD.CELLGetValue(0, "IpCount"); // if count number of votes for ip number
         if (typeof iVoteCount === "number")
             this.poll.count = iVoteCount;
         else
             this.poll.count = 0;
+        if (this.IsVoter() === false && iIpCount > 0) {
+            this.poll.count = iIpCount;
+        }
         if (iQuestionCount > 0) {
             // ## Generate title for poll
             let eTitle = eRoot.querySelector("[data-title]");
