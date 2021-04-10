@@ -34,6 +34,7 @@ export class CApplication {
       });
 
       this.m_sAlias = "guest";                                                  // change this based on what alias that is used
+      //this.m_sAlias = "per";
       this.m_sQueriesSet = "vote";
    }
 
@@ -70,12 +71,12 @@ export class CApplication {
       if( this.m_callAction ) this.m_callAction.call( this, sMessage );
    }
 
-   OnResponse(eSection, sMethod) {
+   OnResponse(eSection, sMethod: string , sHint: string ) {
       let aItem = eSection.getElementsByTagName('item');
       for(let i = 0; i < aItem.length; i++) {
          let eItem = aItem[ i ];
          const sName = eItem.getAttribute("name");
-         this.page.ProcessResponse(eItem, sName);
+         this.page.ProcessResponse(eItem, sName, sHint);
 
       }
    }
@@ -98,7 +99,7 @@ export class CApplication {
          const sComponent = get_text(eSection, "component");
          const sFile = get_text(eSection, "file");
          const sHint = get_text(eSection, "hint");
-         oApplication.OnResponse(eSection, sMethod);
+         oApplication.OnResponse(eSection, sMethod, sHint);
       }
       else if(sMethod === "SYSTEM_GetUserData") {
          oApplication.CallOwner("server-session");

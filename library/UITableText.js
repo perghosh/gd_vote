@@ -63,15 +63,18 @@ export class CUITableText {
         this.m_aRowBody = o.body || [];
         this.m_iColumnCount = 0;
         this.m_eComponent = null;
+        this.m_oDispatch = o.dispatch || null;
         this.m_oEdits = o.edits || null;
         this.m_sId = o.id || CUITableText.s_sWidgetName + (new Date()).getUTCMilliseconds() + ++CUITableText.s_iIdNext;
         this.m_aInput = o.edit ? [-1, -1, null, -1, -1] : null;
-        this.m_sName = o.name || "";
+        this.m_sName = o.name || CUITableText.s_sWidgetName;
         this.m_iOpenEdit = 0;
         this.m_aOrder = [];
         this.m_eParent = o.parent || null;
-        this.m_aRowPhysicalIndex = null,
-            this.m_iRowCount = 0;
+        this.m_aRowPhysicalIndex = null;
+        this.m_iRowStart = o.start || 0;
+        this.m_iRowOffsetStart = o.offset_start || 0;
+        this.m_iRowCount = 0;
         this.m_iRowCountMax = o.max || -1;
         this.m_aSection = o.section || ["toolbar", "title", "header", "body", "footer", "statusbar"]; // sections "header" and "body" are required
         this.m_aSelected = [];
@@ -134,6 +137,8 @@ export class CUITableText {
     get data() { return this.m_oTableData; }
     get trigger() { return this.m_oTableDataTrigger; }
     get state() { return this.m_iState; }
+    get dispatch() { return this.m_oDispatch; }
+    set dispatch(oDispatch) { this.m_oDispatch = oDispatch; }
     /**
      * Get edits object
      */
@@ -155,18 +160,75 @@ export class CUITableText {
     set_state(_On, iState) {
         this.m_iState = _On ? this.m_iState | iState : this.m_iState & ~iState;
     }
+    SetProperty(sName, _Value) {
+        sName = sName.toLowerCase();
+        switch (sName) {
+            case "name":
+                this.m_sName = _Value;
+                break;
+            case "rowstart":
+                this.m_iRowStart = _Value;
+                break;
+            case "rowcount":
+                this.m_iRowCount = _Value;
+                break;
+            case "rowcountmax":
+                this.m_iRowCountMax = _Value;
+                break;
+        }
+    }
+    /**
+     * General update method where operation depends on the iType value
+     * @param iType
+     */
     update(iType) {
         switch (iType) {
-            case 26 /* UpdateDataNew */: {
+            case 28 /* UpdateDataNew */: {
                 this.Render();
             }
         }
     }
+    /**
+     *
+     * @param oMessage
+     * @param sender
+     */
+    on(oMessage, sender) {
+        const [sCommand, sType] = oMessage.command.split(".");
+        switch (sCommand) {
+            case "update":
+                this.Render();
+                break;
+            case "move":
+                {
+                    if (oMessage?.data?.trigger & 65536 /* TRIGGER_BEFORE */) {
+                        if (sType === "previous" && this.m_iRowStart <= 0)
+                            return false;
+                        else if (sType === "next") {
+                            // Trying to move beyond number of rows in table data
+                            if (this.data.ROWGetCount() < (this.m_iRowStart + this.m_iRowOffsetStart + this.m_iRowCountMax))
+                                return false;
+                        }
+                        return;
+                    }
+                    if (sType === "previous")
+                        this.ROWMove(-this.m_iRowCountMax); // move back one "page"
+                    else if (sType === "next")
+                        this.ROWMove(this.m_iRowCountMax); // move forward one "page"
+                }
+                break;
+        }
+    }
+    /**
+     * Create html sections for ui table
+     * @param {HTMLElement} [eParent] parent element for sections.
+     */
     Create(eParent) {
+        eParent = eParent || this.m_eParent;
         let eComponent = this.GetComponent(true); // create component in not created
         this.create_sections(eComponent);
         if (eComponent.parentElement === null) {
-            this.m_eParent.appendChild(eComponent);
+            eParent.appendChild(eComponent);
         }
     }
     /** BLOG: children, childNodes and dataset
@@ -499,6 +561,8 @@ export class CUITableText {
         let o = {};
         if (this.m_iRowCountMax >= 0)
             o.max = this.m_iRowCountMax; // if max rows returned is set
+        if (this.m_iRowStart >= 0)
+            o.begin = this.m_iRowStart + this.m_iRowOffsetStart;
         if (this.m_aInput) {
             this.m_aInput[0] = -1;
             this.m_aInput[1] = -1;
@@ -794,6 +858,11 @@ export class CUITableText {
         this.m_aRowPhysicalIndex.splice(iRow, 0, ...aIndex); // Add row index for new rows, these are negative because data do not exist in CTableData
         return aRow;
     }
+    /**
+     * Validate values in row
+     * @param  {number | number[]}    _Row [description]
+     * @return {boolean}     [description]
+     */
     ROWValidate(_Row) {
         let aError = [];
         if (typeof _Row === "number")
@@ -811,6 +880,32 @@ export class CUITableText {
             });
         }
         return aError.length ? aError : true;
+    }
+    ROWMove(iOffset) {
+        let iStart = this.m_iRowStart;
+        iStart += iOffset;
+        if (iStart < 0)
+            iStart = 0;
+        if (iStart !== this.m_iRowStart) {
+            let oTD;
+            const oTrigger = this.trigger; // Get trigger object with trigger logic
+            if (oTrigger) {
+                oTD = this._get_triggerdata();
+                oTD.iEvent = 65560 /* BeforeMove */;
+                const bOk = oTrigger.Trigger(65560 /* BeforeMove */, oTD);
+                if (bOk === false)
+                    return;
+            }
+            this.m_iRowStart = iStart;
+            if (this.dispatch) {
+                this.dispatch.NotifyConnected(this, { command: "move", data: { start: iStart, count: this.m_iRowCount, max: this.m_iRowCountMax } });
+            }
+            this.Render();
+            if (oTrigger) {
+                oTD.iEvent = 131097 /* AfterMove */;
+                oTrigger.Trigger(131097 /* AfterMove */, oTD);
+            }
+        }
     }
     /**
      * Get parent section element for element sent as argument
@@ -1202,53 +1297,6 @@ export class CUITableText {
             while ((eRow = eRow.nextElementSibling) !== null && eRow.dataset.record !== "1")
                 ; // go to next sibling root row
         });
-        /*
-        this.m_aRowBody.forEach((aRow, iIndex: number) => {
-           let iRow = this.m_aRowPhysicalIndex[ iIndex ], s, o;
-           let eR = eRow;                                    // eRow is the main row, but row could hold many child rows with values
-           eR.dataset.row = iRow.toString();
-           if( eR.dataset.type !== "row" ) {
-              eR = eR.querySelector('[data-type="row"]');     console.assert( eR !== null, "No row element for column cells." );
-           }
-           let eColumn: HTMLElement = <HTMLElement>eR.firstElementChild;
-           for(var i = 0; i < this.m_iColumnCount; i++) {
-              // const oColumn = this.data.COLUMNGet( this._column_in_data( i ) );
-              const oPosition = this.m_aColumnPosition[ i ];
-              let sValue = aRow[ i ];
-              if( bCall ) {
-                 let bRender = true;
-                 for(let j = 0; j < this.m_acallRender.length; j++) {
-                    let b = this.m_acallRender[j].call(this, "beforeCellValue", sValue, eColumn, oPosition );
-                    if( b === false ) bRender = false;
-                 }
-                 if( bRender === false ) continue;
-              }
-              
-              if( !oPosition.row ) {                                              // place value on record row ?
-                 let e = this.ELEMENTGetCellValue(eColumn);                       // get cell value element
-                 if(sClass) e.classList.add(sClass);                              //
-                 if(Object.keys(aStyle[ i ][1]).length > 0) Object.assign(e.style, aStyle[ i ][1]);
-  
-                 if( bSetValue === false ) {
-                    if(sValue !== null && sValue != void 0) e.innerText = sValue.toString();
-                    else if( e.hasAttribute("value") === false ) e.innerText = " ";
-                 }
-                 else {
-                    if(sValue !== null && sValue != void 0) {
-                       if("value" in e) { (<HTMLElement>e).setAttribute("value", sValue.toString()); }
-                       else e.innerText = sValue.toString();
-                    }
-                    else if( e.hasAttribute("value") === false ) e.innerText = " ";
-                 }
-  
-                 if(bCall) this.m_acallRender.forEach((call) => { call.call(this, "afterCellValue", sValue, eColumn, oPosition); });
-                 eColumn = <HTMLElement>eColumn.nextElementSibling;                 // next column element in row
-              }
-  
-           }
-           while( (eRow = <HTMLElement>eRow.nextElementSibling) !== null && (<HTMLElement>eRow).dataset.record !== "1" ); // go to next sibling root row
-        });
-        */
         return eSection;
     }
     /**
@@ -1457,7 +1505,7 @@ export class CUITableText {
             //         let eSection = document.createElement(sHtmlSection);                  // create section
             //         eSection.dataset.section = sName;                                     // set section name, used to access section
             //         eSection.dataset.widget = CUITableText.s_sWidgetName;
-            if (sName === "body")
+            if (sName === "body" && this.is_state(32 /* DisableFocus */) === false)
                 eSection.tabIndex = -1; // tab index on body to enable keyboard movement
             let a = sClass.split(" ");
             a.push(CUITableText.s_sWidgetName + "-" + sName);
@@ -1631,6 +1679,8 @@ export class CUITableText {
                 if (iColumn === -1)
                     iColumn = j;
                 let e = document.createElement(sHtmlCell);
+                if (sClass)
+                    e.className = sClass;
                 e.dataset.c = iColumn.toString();
                 const oFormat = this.m_aColumnFormat[iColumn];
                 if (typeof oFormat.html === "string")
@@ -1689,6 +1739,9 @@ export class CUITableText {
         // Create rows by cloning them into body
         for (let i = 0; i < this.m_iRowCount; i++) {
             eSection.appendChild(eFragment.cloneNode(true));
+        }
+        if (this.dispatch) {
+            this.dispatch.NotifyConnected(this, { command: "update.body", data: { start: this.m_iRowStart, max: this.m_iRowCountMax, count: this.m_iRowCount, trigger: 65538 /* AfterCreate */ } });
         }
         return eSection;
     }
@@ -1847,6 +1900,25 @@ export class CUITableText {
         return bCall;
     }
     /**
+     * Call action callbacks
+     * @param  {string}  sType Type of action
+     * @param  {Event}   e        event data if any
+     * @param  {string}  sSection section name
+     * @return {unknown} if false then disable default action
+     */
+    _action(sType, e, sSection) {
+        if (this.m_acallAction && this.m_acallAction.length > 0) {
+            let EVT = this._get_triggerdata();
+            let i = 0, iTo = this.m_acallAction.length;
+            let callback = this.m_acallAction[i];
+            while (i++ < iTo) {
+                let bResult = callback.call(this, sType, EVT, sSection);
+                if (bResult === false)
+                    return false;
+            }
+        }
+    }
+    /**
      * Handle element events for ui table text. Events from elements calls this method that will dispatch it.
      * @param {string} sType event name
      * @param {Event} e event data
@@ -1999,12 +2071,15 @@ export class CUITableText {
      * @param iIndex
      */
     _column_in_ui(iIndex) {
-        let i = this.m_aColumnPhysicalIndex.length;
-        while (--i >= 0) {
-            if (this.m_aColumnPhysicalIndex[i] === iIndex)
-                return i;
+        if (this.m_aColumnPhysicalIndex) {
+            let i = this.m_aColumnPhysicalIndex.length;
+            while (--i >= 0) {
+                if (this.m_aColumnPhysicalIndex[i] === iIndex)
+                    return i;
+            }
+            return -1;
         }
-        return -1;
+        return iIndex;
     }
     _get_triggerdata() {
         let o = { dataUI: this, data: this.data };

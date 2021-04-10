@@ -16,6 +16,7 @@ export class CApplication {
             //url: "http://localhost:8080/so/jq.srf?"
         });
         this.m_sAlias = "guest"; // change this based on what alias that is used
+        //this.m_sAlias = "per";
         this.m_sQueriesSet = "vote";
     }
     get alias() { return this.m_sAlias; }
@@ -47,12 +48,12 @@ export class CApplication {
         if (this.m_callAction)
             this.m_callAction.call(this, sMessage);
     }
-    OnResponse(eSection, sMethod) {
+    OnResponse(eSection, sMethod, sHint) {
         let aItem = eSection.getElementsByTagName('item');
         for (let i = 0; i < aItem.length; i++) {
             let eItem = aItem[i];
             const sName = eItem.getAttribute("name");
-            this.page.ProcessResponse(eItem, sName);
+            this.page.ProcessResponse(eItem, sName, sHint);
         }
     }
     static CallbackServer(eSection, sMethod, e) {
@@ -72,7 +73,7 @@ export class CApplication {
             const sComponent = get_text(eSection, "component");
             const sFile = get_text(eSection, "file");
             const sHint = get_text(eSection, "hint");
-            oApplication.OnResponse(eSection, sMethod);
+            oApplication.OnResponse(eSection, sMethod, sHint);
         }
         else if (sMethod === "SYSTEM_GetUserData") {
             oApplication.CallOwner("server-session");

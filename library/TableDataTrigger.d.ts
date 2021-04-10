@@ -34,15 +34,17 @@ export declare const enum enumTrigger {
     AfterRemoveRow_ = 21,
     BeforeSetCellError_ = 22,
     AfterSetCellError_ = 23,
-    OnSetValueError_ = 24,
-    OnResize_ = 25,
-    UpdateDataNew = 26,
-    UpdateData = 27,
-    UpdateRowNew = 28,
-    UpdateRowDelete = 29,
-    UpdateRow = 30,
-    UpdateCell = 31,
-    LAST_EVENT = 32,
+    BeforeMove_ = 24,
+    AfterMove_ = 25,
+    OnSetValueError_ = 26,
+    OnResize_ = 27,
+    UpdateDataNew = 28,
+    UpdateData = 29,
+    UpdateRowNew = 30,
+    UpdateRowDelete = 31,
+    UpdateRow = 32,
+    UpdateCell = 33,
+    LAST_EVENT = 34,
     MASK = 65535,
     TRIGGER_BEFORE = 65536,
     TRIGGER_AFTER = 131072,
@@ -70,11 +72,12 @@ export declare const enum enumTrigger {
     AfterRemoveRow = 131093,
     BeforeSetCellError = 65558,
     AfterSetCellError = 131095,
-    OnResize = 262169
+    BeforeMove = 65560,
+    AfterMove = 131097,
+    OnResize = 262171
 }
 /**
  * Event object for events sent from ui table data items
- *
  */
 export declare type EventDataTable = {
     column?: tabledata_column;
@@ -84,6 +87,7 @@ export declare type EventDataTable = {
     iEventAll?: number;
     edit?: edit.CEdit;
     eElement?: HTMLElement;
+    eEvent?: Event;
     iReason?: number;
     information?: unknown;
     browser_event?: string;
@@ -120,8 +124,8 @@ export declare class CTableDataTrigger {
      * @param aArgument
      * @param callback
      */
-    Trigger(iTrigger: number, e: EventDataTable, aArgument: any | any[], callback?: (any: any) => any): boolean;
-    Trigger(aTrigger: number[], e: EventDataTable, aArgument: any | any[], callback?: (any: any) => any): boolean;
+    Trigger(iTrigger: number, e: EventDataTable, aArgument?: any | any[], callback?: (any: any) => any): boolean;
+    Trigger(aTrigger: number[], e: EventDataTable, aArgument?: any | any[], callback?: (any: any) => any): boolean;
     /**
      *
      * @param aTrigger

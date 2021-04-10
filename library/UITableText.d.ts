@@ -1,24 +1,29 @@
-import { CTableData, CRowRows, enumMove, IUITableData, tabledata_column, tabledata_position, tabledata_format } from "./TableData.js";
+import { CTableData, CRowRows, enumMove, DispatchMessage, IUITableData, tabledata_column, tabledata_position, tabledata_format } from "./TableData.js";
 import { edit } from "./TableDataEdit.js";
 import { CTableDataTrigger, EventDataTable } from "./TableDataTrigger.js";
+import { CDispatch } from "./Dispatch.js";
 export declare const enum enumState {
     HtmlValue = 1,
     SetDirtyRow = 2,
     SetHistory = 4,
     SetValue = 8,
-    SetOneClickActivate = 16
+    SetOneClickActivate = 16,
+    DisableFocus = 32
 }
 declare namespace details {
     type construct = {
         body?: unknown[][];
-        callback_action?: ((sType: string, e: EventDataTable, sSection: string) => boolean) | ((sType: string, e: EventDataTable, sSection: string) => boolean)[];
-        callback_create?: ((sType: string, e: EventDataTable, sSection: string) => boolean) | ((sType: string, e: EventDataTable, sSection: string) => boolean)[];
-        callback_render?: ((sType: string, e: EventDataTable, sSection: string, oColumn?: tabledata_column) => boolean) | ((sType: string, e: EventDataTable, sSection: string, oColumn?: tabledata_column) => boolean)[];
+        callback_action?: ((sType: string, e: EventDataTable, sSection: string) => boolean | void) | ((sType: string, e: Event | EventDataTable, sSection: string) => boolean | void)[];
+        callback_create?: ((sType: string, e: EventDataTable, sSection: string) => boolean | void) | ((sType: string, e: EventDataTable, sSection: string) => boolean | void)[];
+        callback_render?: ((sType: string, e: EventDataTable, sSection: string, oColumn?: tabledata_column) => boolean | void) | ((sType: string, e: EventDataTable, sSection: string, oColumn?: tabledata_column) => boolean | void)[];
         callback_renderer?: details.renderer[];
         create?: boolean;
         edit?: boolean;
+        dispatch?: CDispatch;
         edits?: edit.CEdits;
         id?: string;
+        offset_start?: number;
+        start?: number;
         max?: number;
         name?: string;
         parent?: HTMLElement;
@@ -85,15 +90,16 @@ export declare type uitabledata_construct = details.construct;
  *
  * */
 export declare class CUITableText implements IUITableData {
-    m_acallAction: ((sType: string, e: EventDataTable, sSection: string) => boolean)[];
-    m_acallCreate: ((sType: string, e: EventDataTable, sSection: string) => boolean)[];
-    m_acallRender: ((sType: string, e: EventDataTable, sSection: string, oColumn: any) => boolean)[];
+    m_acallAction: ((sType: string, e: Event | EventDataTable, sSection: string) => boolean | void)[];
+    m_acallCreate: ((sType: string, e: EventDataTable, sSection: string) => boolean | void)[];
+    m_acallRender: ((sType: string, e: EventDataTable, sSection: string, oColumn: any) => boolean | void)[];
     m_acallRenderer: details.renderer[];
     m_iColumnCount: number;
     m_aColumnFormat: tabledata_format[];
     m_aColumnPhysicalIndex: number[];
     m_aColumnPosition: tabledata_position[];
     m_eComponent: HTMLElement;
+    m_oDispatch: CDispatch;
     m_oEdits: edit.CEdits;
     m_sId: string;
     m_aInput: [number, number, HTMLElement, number, number];
@@ -102,6 +108,8 @@ export declare class CUITableText implements IUITableData {
     m_aOrder: [number | string, number][];
     m_eParent: HTMLElement;
     m_aRowBody: unknown[][];
+    m_iRowStart: number;
+    m_iRowOffsetStart: number;
     m_iRowCount: number;
     m_iRowCountMax: number;
     m_aRowPhysicalIndex: number[];
@@ -160,6 +168,8 @@ export declare class CUITableText implements IUITableData {
     get data(): CTableData;
     get trigger(): CTableDataTrigger;
     get state(): number;
+    get dispatch(): CDispatch;
+    set dispatch(oDispatch: CDispatch);
     /**
      * Get edits object
      */
@@ -179,7 +189,22 @@ export declare class CUITableText implements IUITableData {
      * @param iState
      */
     set_state<T>(_On: T, iState: number): void;
+    SetProperty(sName: string, _Value: string | number): void;
+    /**
+     * General update method where operation depends on the iType value
+     * @param iType
+     */
     update(iType: number): any;
+    /**
+     *
+     * @param oMessage
+     * @param sender
+     */
+    on(oMessage: DispatchMessage, sender: IUITableData): boolean;
+    /**
+     * Create html sections for ui table
+     * @param {HTMLElement} [eParent] parent element for sections.
+     */
     Create(eParent?: HTMLElement): void;
     /** BLOG: children, childNodes and dataset
      * Get root html element for components, create the component element if argument is true and component element isn't found
@@ -299,7 +324,13 @@ export declare class CUITableText implements IUITableData {
      */
     ROWGet(iRow: number): unknown[];
     ROWInsert(iRow: number, _Row?: number | unknown[] | unknown[][]): unknown[][];
+    /**
+     * Validate values in row
+     * @param  {number | number[]}    _Row [description]
+     * @return {boolean}     [description]
+     */
     ROWValidate(_Row: number | number[]): boolean | [number, number, unknown, unknown][];
+    ROWMove(iOffset: number): void;
     /**
      * Get parent section element for element sent as argument
      * @param {HTMLElement} eElement element that sections is returned for.
@@ -444,6 +475,14 @@ export declare class CUITableText implements IUITableData {
     _create_section(aSection: string | string[], sName: string): [HTMLElement, HTMLElement];
     _has_create_callback(sName: any, v: EventDataTable, sSection: any, call?: ((sType: string, v: any, e: HTMLElement) => boolean)): boolean;
     _has_render_callback(sName: any, sSection: any): boolean;
+    /**
+     * Call action callbacks
+     * @param  {string}  sType Type of action
+     * @param  {Event}   e        event data if any
+     * @param  {string}  sSection section name
+     * @return {unknown} if false then disable default action
+     */
+    private _action;
     /**
      * Handle element events for ui table text. Events from elements calls this method that will dispatch it.
      * @param {string} sType event name

@@ -125,8 +125,11 @@ export class CTableData {
             eType = eType || oFormat.type?.type;
             oFormat = oFormat.format;
         }
-        if (!eType)
+        if (!eType) {
+            if (Array.isArray(_Value))
+                _Value = _Value[0];
             eType = CTableData.GetJSType(typeof _Value);
+        }
         const _Old = _Value;
         if (!oFormat.const) {
             _Value = CTableData.ConvertValue(_Value, eType);
@@ -139,9 +142,21 @@ export class CTableData {
                         aError = [false, sKey];
                     break;
                 case "min":
-                    if (((eType & 262144 /* group_string */) && (typeof _Value !== "string" || _Value.length < _rule)) ||
-                        ((eType & 65536 /* group_number */) && (typeof _Value !== "number" || _Value < _rule)))
-                        aError = [false, sKey];
+                    if (eType & 262144 /* group_string */) {
+                        if (_Value.toString().length < _rule)
+                            aError = [false, sKey];
+                    }
+                    else if (eType & 65536 /* group_number */) {
+                        let i;
+                        if (typeof _Value === "string")
+                            i = parseInt(_Value, 10);
+                        else if (typeof _Value === "boolean")
+                            i = _Value ? 1 : 0;
+                        else
+                            i = _Value;
+                        if (i < _rule)
+                            aError = [false, sKey];
+                    }
                     break;
                 case "pattern":
                     let a = _rule;
@@ -1076,7 +1091,7 @@ export class CTableData {
         }
         if (iFormat & 2 /* Format */) {
             iC--; // decrease column with one because first value is index key for row
-            if (this.m_aColumn[iC].position?.convert) {
+            if (this.m_aColumn[iC]?.position?.convert) {
                 _V = this.m_aColumn[iC].position.convert(_V, [iR, iC]);
             }
         }
@@ -1565,7 +1580,7 @@ export class CTableData {
             iC = this._index(_Column) + 1; // First column among rows has index to row
         }
         else {
-            iR = iRow;
+            iR = this._row(iRow);
             iC = _Column + 1; // if raw then _Column has to be a number, just add one for the row key column
         }
         return [iR, iC];

@@ -7,12 +7,12 @@
 
 |Name|Description
 |:-|:-|
-
 | SendVote | Send vote to server to register vote for user |
 | SendVoter | Create new voter for collected information when user tried to logon. |
-| SetActivePoll | Calling this method triggers a chain of operations that will display needed information about active poll |
+| **SetActiveState** | Set active state for page, use this when parts in head or body is changed |
+| **SetActivePoll** | Calling this method triggers a chain of operations that will display needed information about active poll |
 | OpenMessage | Show message to user |
-| ProcessResponse | Process responses from server |
+| **ProcessResponse** | Process responses from server |
 | QUERYGetLogin | Get login information for voter. query = `login` |
 | QUERYGetPollList | Get active polls. query = poll_list |
 | QUERYGetPollOverview | Get information about selected poll. query = poll_overview. query = `poll_overview` |
@@ -20,6 +20,7 @@
 | QUERYGetPollHashtags | Get hashtags for poll or all poll hashtags. Query used is `poll_hashtags` |
 | RESULTCreateLogin | Create login section |
 | RESULTCreateFindVoter | Result from finding voter, this is called if user tries to login |
+| RESULTCreatePollHashtags | Create hastag tags to filter from |
 | RESULTCreatePollOverview | Process result from  `poll_overview`|
 | RESULTCreatePollOverviewLinks | Process result from `poll_links` and render these for user |
 | RESULTCreateQuestionPanel | Create panels for each question that belongs to current selected poll. Like containers for selectable votes |
@@ -72,6 +73,7 @@ export class CPage {
     */
    m_oPoll: { poll: number, vote: number, count: number };
    m_oState: { [key_name: string]: string|number|boolean }; // States for page, may be used for outside actions
+   m_sSearchMode: string;           // Search mode (this is top section in page), valid types are "hash", "field", "area", "personal"
    m_oTDVoter: CTableData;          // User data for voter
    m_sViewMode: string;             // view mode page is in
    m_aVoter: [number,string,string];// key, alias and name for current voter
@@ -118,6 +120,12 @@ export class CPage {
    get app() { return this.m_oApplication; }                                   // get application object
    get poll() { return this.m_oPoll; }
    get state() { return this.m_oState; }                                       // get state object
+
+   get search_mode() { return this.m_sSearchMode; }
+   set search_mode( sMode ) {
+      this.m_sSearchMode = sMode; 
+   }
+
    get view_mode() { return this.m_sViewMode; }
    set view_mode( sMode ) {                                          console.assert( sMode === "vote" || sMode === "count", "Invalid view mode: " + sMode );
       this.m_sViewMode = sMode; 
@@ -138,7 +146,10 @@ export class CPage {
 
       if( typeof iActivePoll === "number" ) {
          this.poll.poll = iActivePoll;
-         if( iActivePoll <= 0 ) return;
+         if( iActivePoll <= 0 ) {
+            this.RESULTCreatePollOverview("idPollOverview");// this clears poll overview
+            return;
+         }
       }
 
       this.QUERYGetPollOverview(this.poll.poll, sName);
@@ -157,6 +168,7 @@ export class CPage {
 
       this.WalkNextState();
    }
+
 
    /**
     * Return true if voter key is found
@@ -185,21 +197,31 @@ export class CPage {
       return null;
    }
 
+   /**
+    * Set active state for page, use this when parts in head or body is changed
+    * @param sState
+    * @param eElement
+    * @param aCondition
+    */
    SetActiveState(sState: string, eElement?: HTMLElement, aCondition?: [details.condition][]) {
       const [sSection, sName] = sState.split(".");
 
-      if( sSection === "body" ) this.view_mode = sName;
+      if(sSection === "body") {
+         this.view_mode = sName;
+         let oPageState: CPageState = this.GetPageState(sSection, sName);
+         // Clear active state for section
+         for(let i = 0; i < this.m_aPageState.length; i++) {
+            const o = this.m_aPageState[ i ];
+            if(sSection === o.section) o.SetActive();        // clear active state
+         }
 
-      let oPageState: CPageState = this.GetPageState( sSection, sName );
-      // Clear active state for section
-      for(let i = 0; i < this.m_aPageState.length; i++) {
-         const o = this.m_aPageState[i];
-         if( sSection === o.section ) o.SetActive();        // clear active state
+         oPageState.SetActive(aCondition);
+         this.m_oPageState = oPageState;
       }
-
-      oPageState.SetActive( aCondition );
-      this.m_oPageState = oPageState;
-      //this.WalkNextState();
+      else if(sSection === "head") {
+         this.search_mode = sName;
+         if(sName === "hash") { this.QUERYGetPollHashtags(); }
+      }
    }
 
    CallOwner( sMessage ) {
@@ -371,7 +393,7 @@ export class CPage {
 
 
 
-   ProcessResponse(eItem: Element, sName: string ) {
+   ProcessResponse(eItem: Element, sName: string, sHint: string ) {
       let oResult = JSON.parse(eItem.textContent);
       switch(sName) {
          case "result": {
@@ -423,14 +445,21 @@ export class CPage {
             else if(sQueryName === "find_voter") {
                this.RESULTCreateFindVoter("idFindVoter", oResult);
             }
+            else if(sQueryName === "poll_hashtags") {
+               this.RESULTCreatePollHashtags("idSearchHash", oResult);
+            }
             /*
             else if(sQueryName === "poll_question_list") {
                this.RESULTCreateQuestionPanel("idPollQuestionList", oResult);
             }
             */
          }  break;
-         case "load":
+         //case "load":
+         case "load_if_not_found":
             this.CallOwner("load");
+            break;
+         case "query_conditions":
+            if( sHint === "poll_list") this.CONDITIONListHashtags( "idPollHashtag", oResult );
             break;
          case "message":
             const sType = oResult.type;
@@ -483,10 +512,22 @@ export class CPage {
    /**
     * Get active polls. query = poll_list
     */
-   QUERYGetPollList() {
+   QUERYGetPollList( aHashtag?: [number, string][], bDelete?: boolean ) {
+      let sXml;
       let request = this.app.request;
-      let oCommand = { command: "get_result", query: "poll_list", set: "vote", count: 100, format: 1, start: 0 };
-      request.Get("SCRIPT_Run", { file: "PAGE_result.lua", json: request.GetJson(oCommand) });
+      if( aHashtag ) {
+         let oQuery = new CQuery();
+         aHashtag.forEach( a => { oQuery.CONDITIONAdd( { table: "TPoll1", id: "HashtagKey", value: a[0], simple: a[1], operator: 0 }); });
+         sXml = <string>oQuery.CONDITIONGetXml();
+      }
+
+
+      let oCommand: {[key:string]: string|number} = { command: "get_result get_query_conditions", query: "poll_list", set: "vote", count: 100, format: 1, start: 0 };
+      if( sXml ) {
+         oCommand.command = "add_condition_to_query " + oCommand.command;
+         if( bDelete ) oCommand.delete = 1;
+      }
+      request.Get("SCRIPT_Run", { file: "PAGE_result.lua", hint: "poll_list", json: request.GetJson(oCommand) }, sXml);
    }
 
    /**
@@ -711,6 +752,57 @@ export class CPage {
       }
    }
 
+
+   /**
+    * Create hastag tags to filter from
+    * @param {string|HTMLElement} eRoot Container to render in
+    * @param {any} oResult Hastag to filter from
+    */
+   RESULTCreatePollHashtags(eRoot: string | HTMLElement, oResult: any) {
+      if(typeof eRoot === "string") eRoot = document.getElementById(eRoot);
+      eRoot.innerHTML = "";
+      let oTD = new CTableData({ id: oResult.id, name: oResult.name });
+      const aHeader = oResult.table.header;
+      CPage.ReadColumnInformationFromHeader(oTD, aHeader);
+      oTD.ReadArray(oResult.table.body, { begin: 0 });
+      oTD.COLUMNSetPropertyValue(["BadgeK","PollK"], "position.hide", true);
+      oTD.COLUMNSetPropertyValue("FName", "style.cssText", "margin: 2px; cursor: pointer;");
+
+      const oStyle = {
+         html_row: "span",                                  // "div" for rows and "row" class
+         html_cell: "span.tag is-info is-medium",           // "span" for cells
+      }
+
+      const options = {
+         //dispatch: oDispatch,
+         parent: eRoot,                                     // container
+         section: ["body"],                                 // sections to create, only one body section
+         table: oTD,                                        // source data
+         style: oStyle,                                     // styling
+         callback_action: (sType: string, e, sSection): boolean => {
+            if(sType === "click") {
+               let eRow = <HTMLElement>e.srcElement;
+               if( eRow.tagName === "SPAN") {
+                  if( eRow.dataset.type !== "row" ) eRow = eRow.parentElement;
+
+                  const iRow = parseInt( eRow.dataset.line, 10 );
+
+                  const iKey = <number>oTD.CELLGetValue( iRow, "BadgeK");
+                  const sName = <string>oTD.CELLGetValue( iRow, "FName");
+                  this.QUERYGetPollList( [[iKey, sName]] );
+               }
+            }
+
+            return true;
+         }
+      };
+
+      let TTHashtag = new CUITableText(options);            // create CUITableText that render table in browser
+      oTD.UIAppend(TTHashtag);                              // add ui object to source data object (CTableData)
+      TTHashtag.Render();                                   // render table
+   }
+
+
    /**
     * Create dropdown with active polls
     * @param {string|HTMLElement} eRoot id or string to parent element for select list
@@ -718,6 +810,7 @@ export class CPage {
     */
    RESULTCreatePollList(eRoot: string|HTMLElement, oResult: any) {
       if(typeof eRoot === "string") eRoot = document.getElementById(eRoot);
+      this.SetActivePoll(-1); // No active poll when poll list is updated
 
 
       let oTD = new CTableData({ id: oResult.id, name: oResult.name });
@@ -749,7 +842,7 @@ export class CPage {
          });
          eList.appendChild(eSelect);
 
-         eList.addEventListener('change', e => {
+         eSelect.addEventListener('change', e => {
             let iPoll = parseInt((<HTMLSelectElement>e.srcElement).value, 10);
             if(isNaN(iPoll)) {
                this.SetActivePoll(-1);
@@ -1070,6 +1163,76 @@ export class CPage {
       TDVote.UIAppend(TTVote);
 
       TTVote.Render();
+   }
+
+   CONDITIONListHashtags( eRoot: string|HTMLElement, oResult: any ) {
+      if(typeof eRoot === "string") eRoot = document.getElementById(eRoot);
+
+      eRoot.innerHTML = "";
+
+      let oTD = new CTableData();
+      oTD.ReadObjects( oResult );
+      if( oTD.COLUMNGetCount() === 0 ) return;
+
+      oTD.COLUMNSetPropertyValue(true, "position.hide", true); // Hide all
+      oTD.COLUMNSetPropertyValue("simple", "position.hide", false);// Show simple
+      oTD.COLUMNSetPropertyValue("simple", "style.cssText", "margin: 2px; cursor: pointer;");      
+
+      const oStyle = {
+         html_row: "span",                                  // "div" for rows and "row" class
+         html_cell: "span.tag is-light is-medium",           // "span" for cells
+      }
+
+      const options = {
+         //dispatch: oDispatch,
+         parent: eRoot,                                     // container
+         section: ["body"],                                 // sections to create, only one body section
+         table: oTD,                                        // source data
+         state: enumState.DisableFocus,                     // disable cell focus, this removes the tab-stop attribute
+         style: oStyle,                                     // styling
+         callback_action: (sType: string, e, sSection): boolean => {
+            if(sType === "click") {
+               let eRow = <HTMLElement>e.srcElement;
+               if( eRow.dataset.type !== "row" ) eRow = eRow.closest("[data-type]");
+
+               const iRow = parseInt( eRow.dataset.line, 10 );
+
+               const sUuid = <string>oTD.CELLGetValue( iRow, "uuid");
+               this.QONDITIONRemove( "poll_list", sUuid );
+            }
+            return true;
+         }
+      };
+
+      let TTHashtag = new CUITableText(options);            // create CUITableText that render table in browser
+
+      TTHashtag.COLUMNSetRenderer("simple", (e, v, a) => {
+         let eSpan = <HTMLElement>e;
+         eSpan.textContent = <string>v;
+         let eButton = document.createElement("button");
+         eButton.className = "delete";
+         eSpan.appendChild( eButton );
+      });
+
+      oTD.UIAppend(TTHashtag);                              // add ui object to source data object (CTableData)
+      TTHashtag.Render();                                   // render table
+   }
+
+   /**
+    * Remove condition from poll_list query
+    * @param {string} sQuery query that conditions are removed from
+    * @param {string | string[]} _Uuid [description]
+    */
+   QONDITIONRemove( sQuery: string, _Uuid: string | string[] ) {
+      let sXml;
+      let request = this.app.request;
+      let oCommand: {[key:string]: string|number} = { command: "delete_condition_from_query get_result get_query_conditions", query: sQuery, set: "vote", count: 100, format: 1, start: 0 };
+
+      if( typeof _Uuid === "string" ) {
+         oCommand.uuid = _Uuid
+      }
+      
+      request.Get("SCRIPT_Run", { file: "PAGE_result.lua", hint: sQuery, json: request.GetJson(oCommand) }, sXml);
    }
 
    /**

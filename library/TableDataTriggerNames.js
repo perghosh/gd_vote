@@ -24,13 +24,15 @@ export function SetTriggerName() {
         [21 /* AfterRemoveRow_ */, "AfterRemoveRow"],
         [22 /* BeforeSetCellError_ */, "BeforeSetCellError"],
         [23 /* AfterSetCellError_ */, "AfterSetCellError"],
-        [25 /* OnResize_ */, "OnResize"],
-        [26 /* UpdateDataNew */, "UpdateDataNew"],
-        [27 /* UpdateData */, "UpdateData"],
-        [28 /* UpdateRowNew */, "UpdateRowNew"],
-        [29 /* UpdateRowDelete */, "UpdateRowDelete"],
-        [30 /* UpdateRow */, "UpdateRow"],
-        [31 /* UpdateCell */, "UpdateCell"],
+        [24 /* BeforeMove_ */, "BeforeMove"],
+        [25 /* AfterMove_ */, "AfterMove"],
+        [27 /* OnResize_ */, "OnResize"],
+        [28 /* UpdateDataNew */, "UpdateDataNew"],
+        [29 /* UpdateData */, "UpdateData"],
+        [30 /* UpdateRowNew */, "UpdateRowNew"],
+        [31 /* UpdateRowDelete */, "UpdateRowDelete"],
+        [32 /* UpdateRow */, "UpdateRow"],
+        [33 /* UpdateCell */, "UpdateCell"],
     ];
     CTableDataTrigger.SetTriggerName(aTrigger);
 }

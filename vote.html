@@ -121,6 +121,11 @@ div[data-section="container"]
 
             </span>
          </div>
+         <div class="navbar-item">
+            <span id="idPollHashtag">
+
+            </span>
+         </div>
       </nav>
 
 
@@ -167,27 +172,31 @@ div[data-section="container"]
          //window.app.page.SetCallback( PAGE_Callback );
       }
 
-      function PAGE_Callback(sMessage) {
-         if( sMessage === "load" ) {
+      /**
+       * Callback used by CPage class. CPage has the main page logic. Some logic is found here
+       * @param sMessage type of operation
+       */
+      function PAGE_Callback(sOperation) {
+         if( sOperation === "load" ) {
             this.QUERYGetLogin();
             this.QUERYGetPollList();
          }
-         if( sMessage === "select-voter") {
+         if( sOperation === "select-voter") {
             let eTab = document.getElementById("idTabSearch").querySelector('[data-index="1"]');
             eTab.remove();
             eTab = document.getElementById("idTabSearch").querySelector('[data-index="5"]');
             eTab.click();
          }
-         else if( sMessage === "insert-voter" ) {
+         else if( sOperation === "insert-voter" ) {
             window.app.page.OpenMessage("Användaren är registrerad och kan rösta efter att ha loggat in igen!");
          }
-         else if( sMessage === "ready-poll-list" ) {
+         else if( sOperation === "ready-poll-list" ) {
             if(this.state.read_url === true) {                                // check url for poll parameter
                delete this.state.read_url;
                this.URLReadSelectedPoll();
             }
          }
-         else if(sMessage === "server-session") {
+         else if(sOperation === "server-session") {
             if( !this.page) {
                this.m_oPage = new CPage(this, {callback_action: PAGE_Callback, read_url: true});
             }
@@ -197,7 +206,7 @@ div[data-section="container"]
 
       /*
        * ## Configure tabs. When user clicks on tab it should be activated and content is shown. 
-       * - Send notification to pagen when tabs is activated.
+       * - Send notification to page when tabs is activated.
        */
       const aTabs = document.querySelectorAll(".tabs");
       aTabs.forEach(eTabs => {
@@ -228,11 +237,12 @@ div[data-section="container"]
 
             // ## Process page operation based on what tab that is selected
             if(eContainer.dataset.pageType === "search") {
-
+               const oPage = window.app.page;
+               oPage.SetActiveState(eContent.dataset.state, eContent);
             }
             else if(eContainer.dataset.pageType === "vote") {
                const oPage = window.app.page;
-               oPage.SetActiveState(eContent.dataset.state, eContent);
+               oPage.SetActiveState(eContent.dataset.state, eContent);        // Set the page state for vote section (results or voting)
                if(oPage.GetActivePoll() > 0) oPage.SetActivePoll(oPage.GetActivePoll());
             }
          });

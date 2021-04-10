@@ -52,11 +52,19 @@ export declare const enum enumValueType {
 export declare namespace browser {
     function AddCSS(sCSS: string): void;
 }
+export declare type DispatchMessage = {
+    source?: string;
+    command: string;
+    target?: string | string[];
+    data?: any;
+};
 export interface IUITableData {
     id: string;
     name: string;
-    data: CTableData;
+    data?: CTableData;
     update: ((iType: number) => any);
+    on: ((oMessage: DispatchMessage, sender: IUITableData) => any);
+    destroy?: (() => void);
 }
 declare namespace details {
     type format = {

@@ -8,7 +8,7 @@ export class CTableDataTrigger {
     constructor(options) {
         const o = options || {};
         this.m_oTableData = o.table || null;
-        this.m_aTrigger = (new Array(32 /* LAST_EVENT */)).fill(true);
+        this.m_aTrigger = (new Array(34 /* LAST_EVENT */)).fill(true);
         this.m_acallTrigger = [];
         if (o.trigger)
             this.m_acallTrigger = Array.isArray(o.trigger) ? o.trigger : [o.trigger];
@@ -28,7 +28,7 @@ export class CTableDataTrigger {
     }
     static SetTriggerName(aName) {
         if (CTableDataTrigger.s_aTriggerName.length === 0)
-            CTableDataTrigger.s_aTriggerName = new Array(32 /* LAST_EVENT */);
+            CTableDataTrigger.s_aTriggerName = new Array(34 /* LAST_EVENT */);
         if (Array.isArray(aName[0])) {
             let i = aName.length;
             while (--i >= 0)
@@ -153,11 +153,11 @@ export class CTableDataTrigger {
     ObserveResize(_1, bAdd) {
         if (typeof bAdd !== "boolean")
             bAdd = true;
-        if (!this.m_oRS) {
+        if (!this.m_oRS) { // No ResizeObserver ? Create
             this.m_oRS = new window.ResizeObserver((aE, oRS) => {
                 let e = this._event({ iReason: 2 /* Browser */ });
                 for (let _e of aE) {
-                    this.TriggerOn(this.Call([262169 /* OnResize */]), e, _e);
+                    this.TriggerOn(this.Call([262171 /* OnResize */]), e, _e);
                 }
             });
         }
