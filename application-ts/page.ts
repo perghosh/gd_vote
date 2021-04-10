@@ -770,7 +770,7 @@ export class CPage {
 
       const oStyle = {
          html_row: "span",                                  // "div" for rows and "row" class
-         html_cell: "span.tag is-info is-medium",           // "span" for cells
+         html_cell: "span.tag is-light is-medium",           // "span" for cells
       }
 
       const options = {
@@ -1180,7 +1180,7 @@ export class CPage {
 
       const oStyle = {
          html_row: "span",                                  // "div" for rows and "row" class
-         html_cell: "span.tag is-light is-medium",           // "span" for cells
+         html_cell: "span.tag is-info is-medium",           // "span" for cells
       }
 
       const options = {

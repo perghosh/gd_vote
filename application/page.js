@@ -666,7 +666,7 @@ export class CPage {
         oTD.COLUMNSetPropertyValue("FName", "style.cssText", "margin: 2px; cursor: pointer;");
         const oStyle = {
             html_row: "span",
-            html_cell: "span.tag is-info is-medium",
+            html_cell: "span.tag is-light is-medium",
         };
         const options = {
             //dispatch: oDispatch,
@@ -1021,7 +1021,7 @@ export class CPage {
         oTD.COLUMNSetPropertyValue("simple", "style.cssText", "margin: 2px; cursor: pointer;");
         const oStyle = {
             html_row: "span",
-            html_cell: "span.tag is-light is-medium",
+            html_cell: "span.tag is-info is-medium",
         };
         const options = {
             //dispatch: oDispatch,
