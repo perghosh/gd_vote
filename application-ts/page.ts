@@ -17,15 +17,18 @@
 | QUERYGetPollList | Get active polls. query = poll_list |
 | QUERYGetPollOverview | Get information about selected poll. query = poll_overview. query = `poll_overview` |
 | QUERYGetPollLinks | Get links for poll. Query used is `poll_links` |
-| QUERYGetPollHashtags | Get hashtags for poll or all poll hashtags. Query used is `poll_hashtags` |
+| QUERYGetPollFilterCount | Get poll result (votes are counted) |
+| QUERYGetPollHashtags | Get hash tags for poll or all poll hash tags. Query used is `poll_hashtags` |
+| RESULTCreatePollList | Create drop-down with active polls |
 | RESULTCreateLogin | Create login section |
 | RESULTCreateFindVoter | Result from finding voter, this is called if user tries to login |
-| RESULTCreatePollHashtags | Create hastag tags to filter from |
+| RESULTCreatePollHashtags | Create hash tags to filter from |
 | RESULTCreatePollOverview | Process result from  `poll_overview`|
 | RESULTCreatePollOverviewLinks | Process result from `poll_links` and render these for user |
+| RESULTCreatePollFilterCount | Create table with poll result |
 | RESULTCreateQuestionPanel | Create panels for each question that belongs to current selected poll. Like containers for selectable votes |
 | RESULTCreateVoteCount | Create markup showing vote count on each answer for poll question |
-|||
+| CONDITIONListHashtags |  List hash tags conditions that filters poll, needed to enable removal of filters |
 |||
 */
 
@@ -114,7 +117,7 @@ export class CPage {
 
       this.m_aVoter = [-1,"",""];         // no voter (-1)
       this.m_aVoteHistory = [];
-      this.HISTORYSerialize(false);
+      //this.HISTORYSerialize(false);
    }
 
    get app() { return this.m_oApplication; }                                   // get application object
@@ -144,6 +147,10 @@ export class CPage {
    SetActivePoll(iActivePoll?: number, sName?: string, bSelect?: boolean ) {
       this.CloseQuestions();
 
+      if( iActivePoll !== this.GetActivePoll() ) {
+         (<HTMLElement>document.getElementById( "idPollOverview" ).querySelector('[data-section="result"]')).style.display = "none";
+      }
+
       if( typeof iActivePoll === "number" ) {
          this.poll.poll = iActivePoll;
          if( iActivePoll <= 0 ) {
@@ -167,6 +174,8 @@ export class CPage {
       }
 
       this.WalkNextState();
+
+      if( this.view_mode === "count" ) this.QUERYGetPollFilterCount( iActivePoll );
    }
 
 
@@ -442,17 +451,15 @@ export class CPage {
             else if(sQueryName === "poll_links") {
                this.RESULTCreatePollOverviewLinks("idPollOverview", oResult);
             }
+            else if(sQueryName === "poll_answer_filtercount") {
+               this.RESULTCreatePollFilterCount("idPollOverview", oResult);
+            }
             else if(sQueryName === "find_voter") {
                this.RESULTCreateFindVoter("idFindVoter", oResult);
             }
             else if(sQueryName === "poll_hashtags") {
                this.RESULTCreatePollHashtags("idSearchHash", oResult);
             }
-            /*
-            else if(sQueryName === "poll_question_list") {
-               this.RESULTCreateQuestionPanel("idPollQuestionList", oResult);
-            }
-            */
          }  break;
          //case "load":
          case "load_if_not_found":
@@ -468,8 +475,9 @@ export class CPage {
                if(sQueryName === "poll_vote") {
                   this.OpenMessage("Din röst har blivit registrerad!")
                   if(this.poll.vote > 0) {
-                     this.m_aVoteHistory.push(this.poll.vote);
-                     this.HISTORYSerialize( true );
+                     //this.m_aVoteHistory.push(this.poll.vote);
+                     //this.HISTORYSerialize( true );
+                     this.QUERYGetPollFilterCount( this.GetActivePoll() );
                   }
                   this.poll.vote = -1;
                }
@@ -562,6 +570,32 @@ export class CPage {
    }
 
    /**
+    * Get poll result, result that can be filtered
+    * @param {number} iPoll   Index to selected poll
+    */
+   QUERYGetPollFilterCount(iPoll: number);
+   QUERYGetPollFilterCount( oAnswer: { answer: number } );
+   QUERYGetPollFilterCount( _1: any) {
+      let request = this.app.request;
+
+      let aCondition: any[];
+      let oCommand: {[k:string]: string|number} = { command: "add_condition_to_query get_result", query: "poll_answer_filtercount", set: "vote", count: 100, format: 1, start: 0 };
+
+      if( typeof _1 === "number" ) { 
+         aCondition = [ { table: "TPoll1", id: "PollK", value: _1 } ];
+         oCommand.delete = 1;
+      }
+      else {
+         if( typeof _1.answer === "number" ) aCondition = [ { table: "TPollVote1", id: "TieFilterAnswer", value: _1.answer } ];
+      }
+      let oQuery = new CQuery( { conditions: aCondition });
+      let sXml = <string>oQuery.CONDITIONGetXml();
+
+      request.Get("SCRIPT_Run", { file: "PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
+   }
+
+
+   /**
     * Return hashtags for selected poll
     * @param {number} [iPoll] Index to selected poll
     */
@@ -626,22 +660,6 @@ export class CPage {
       TDVoter.COLUMNSetPropertyValue("FAlias", "format.max", 25);              // alias need at least three characters
       TDVoter.COLUMNSetPropertyValue("FName", "format.max", 25);
       TDVoter.COLUMNSetPropertyValue("FMail", "format.max", 50);
-
-/*
-      let oStyle = {
-         class_section: "uitabletext_login", class_value_error: "error_value",
-         html_value: `
-<div style='border-bottom: 1px dotted var(--gd-white); padding: 0.5em 1em;'>
-   <div style='display: flex; align-items: stretch;'>
-      <span data-label='1' style='padding: 0px 1em 0px 0px; text-align: right; width: 120px;'></span>
-      <span data-value='1' style='flex-grow: 1; padding: 0px 2px; box-sizing: border-box; background-color: var(--gd-gray);'></span>
-   </div>
-   <div data-description='1'></div>
-   <div class='error-message' data-error='1' style="display: none; margin-left: 120px; text-align:right;"></div>
-</div>
-`
-      }
-*/
 
       let oStyle = {
          class_section: "uitabletext_login", class_value_error: "error_value",
@@ -765,7 +783,7 @@ export class CPage {
       const aHeader = oResult.table.header;
       CPage.ReadColumnInformationFromHeader(oTD, aHeader);
       oTD.ReadArray(oResult.table.body, { begin: 0 });
-      oTD.COLUMNSetPropertyValue(["BadgeK","PollK"], "position.hide", true);
+      oTD.COLUMNSetPropertyValue(["BadgeK"], "position.hide", true);
       oTD.COLUMNSetPropertyValue("FName", "style.cssText", "margin: 2px; cursor: pointer;");
 
       const oStyle = {
@@ -826,7 +844,7 @@ export class CPage {
          eList.innerHTML = "";
          let eSelect = <HTMLElement>document.createElement("select");
          let eOption = <HTMLOptionElement>document.createElement("option");
-         eOption.innerText = "Välj omröstning här!";
+         eOption.innerText = "Välj någon av " + oTD.ROWGetCount() + " frågor";
          eOption.style.fontStyle = "italic";
          eSelect.appendChild(eOption);
          eSelect.className = "has-text-weight-bold";
@@ -895,6 +913,8 @@ export class CPage {
          this.poll.count = iIpCount;
       }
 
+      this.poll.count = 0;
+
       if(iQuestionCount > 0) {
          // ## Generate title for poll
          let eTitle = <HTMLElement>eRoot.querySelector("[data-title]");
@@ -945,6 +965,47 @@ export class CPage {
          eA.className = "panel-block";
          eLink.appendChild(eA);
       }
+   }
+
+   RESULTCreatePollFilterCount(eRoot: string | HTMLElement, oResult: any) {
+      if(typeof eRoot === "string") eRoot = document.getElementById(eRoot);
+
+      let oTD = new CTableData({ id: oResult.id, name: oResult.name });
+      CPage.ReadColumnInformationFromHeader(oTD, oResult.table.header);
+      oTD.ReadArray(oResult.table.body, { begin: 0 });
+
+      const aHeader = oResult.table.header;
+      CPage.ReadColumnInformationFromHeader(oTD, aHeader, (iIndex, oColumn, oTD) => {
+         if(oColumn.key) {
+            oTD.COLUMNSetPropertyValue(iIndex, "position.hide", true);
+         }
+      });
+
+      oTD.COLUMNSetPropertyValue("PollVoteK", "position.hide", false);
+
+      let eResult = <HTMLElement>eRoot.querySelector('[data-section="result"]');
+      eResult.innerHTML = "";
+
+      let oStyle = {
+         html_group: "table.table",                // "table" element and class table
+         html_row: "tr",                           // "tr" element for each row
+         html_cell_header: "th",                   // "th" for column headers
+         html_cell: "td",                          // "td" for cells
+         html_section_header: "thead",             // "thead" for header section
+         html_section_body: "tbody",               // "tbody" for body section
+      }
+
+      let options = {
+         parent: eResult,                          // container
+         section: [ "table.header", "table.body" ],// sections to create
+         table: oTD,                               // source data
+         style: oStyle,                            // styling
+      };
+
+      let oTT = new CUITableText(options);
+      oTD.UIAppend(oTT);
+      oTT.Render();
+      eResult.style.display = "block";                     // show result
    }
 
 
@@ -1119,20 +1180,22 @@ export class CPage {
    RESULTCreateVoteCount(eRoot: string|HTMLElement, oResult: any) {
       if(typeof eRoot === "string") eRoot = document.getElementById(eRoot);
 
-      let TDVote = new CTableData({ id: oResult.id, name: oResult.name });
+      let oTD = new CTableData({ id: oResult.id, name: oResult.name });
 
       const aHeader = oResult.table.header;
-      CPage.ReadColumnInformationFromHeader(TDVote, aHeader, (iIndex, oColumn, oTD) => {
+      CPage.ReadColumnInformationFromHeader(oTD, aHeader, (iIndex, oColumn, oTD) => {
          if(oColumn.key) {
             oTD.COLUMNSetPropertyValue(iIndex, "position.hide", true);
          }
       });
 
-      TDVote.ReadArray(oResult.table.body, { begin: 0 });
-      TDVote.COLUMNSetType( TDVote.ROWGet(1) );
-      TDVote.COLUMNUpdatePositionIndex();
+      oTD.ReadArray(oResult.table.body, { begin: 0 });
+      oTD.COLUMNSetType( oTD.ROWGet(1) );
+      oTD.COLUMNUpdatePositionIndex();
 
-      let iQuestion: number = <number>TDVote.CELLGetValue(0,0);
+      oTD.COLUMNSetPropertyValue("ID_Answer", "position.hide", false);
+
+      let iQuestion: number = <number>oTD.CELLGetValue(0,0);
 
       // ## Find container element to question
       let eSection = <HTMLElement>eRoot.querySelector(`section[data-question="${iQuestion}"]`);
@@ -1148,23 +1211,40 @@ export class CPage {
          html_section_footer: "tfoot",             // "tfoot" for footer section
       }
 
-      let oTrigger = new CTableDataTrigger({ table: TDVote, trigger: CPage.CallbackVote });
+      let oTrigger = new CTableDataTrigger({ table: oTD, trigger: CPage.CallbackVote });
 
       let options = {
          parent: eArticle,                         // container
          section: [ "title", "table.header", "table.body", "footer" ],// sections to create
-         table: TDVote,                            // source data
+         table: oTD,                               // source data
          name: "vote",                             // name to access UI table in CTableData
          style: oStyle,                            // styling
          trigger: oTrigger,
       };
 
-      let TTVote = new CUITableText(options);
-      TDVote.UIAppend(TTVote);
+      let oTT = new CUITableText(options);
+      oTD.UIAppend(oTT);
 
-      TTVote.Render();
+      oTT.COLUMNSetRenderer(0, (e, v, a) => {
+         e.innerHTML = `<button class="button is-light is-small" data-answer="${v}">Filtrera bort</button>`;
+      });
+
+      oTT.Render();
+      eSection = oTT.GetSection("body");
+      eSection.addEventListener("click", (e: Event) => {
+         const eButton = <HTMLElement>e.srcElement;
+         if( eButton.tagName === "BUTTON" ) {
+            const iAnswer = parseInt( eButton.dataset.answer, 10 );
+            this.QUERYGetPollFilterCount({ answer: iAnswer });
+         }
+      });
    }
 
+   /**
+    * List hashtag conditions that filters poll, needed to enable removal of filters
+    * @param {string|HTMLElement} eRoot   element where hastag conditions are listed
+    * @param {any} oResult result from server with conditions
+    */
    CONDITIONListHashtags( eRoot: string|HTMLElement, oResult: any ) {
       if(typeof eRoot === "string") eRoot = document.getElementById(eRoot);
 
@@ -1193,6 +1273,10 @@ export class CPage {
          callback_action: (sType: string, e, sSection): boolean => {
             if(sType === "click") {
                let eRow = <HTMLElement>e.srcElement;
+               if( eRow.dataset.command ) {
+                  if( eRow.dataset.command === "all" ) this.QONDITIONRemove( "poll_list" );
+                  return;
+               }
                if( eRow.dataset.type !== "row" ) eRow = eRow.closest("[data-type]");
 
                const iRow = parseInt( eRow.dataset.line, 10 );
@@ -1216,6 +1300,16 @@ export class CPage {
 
       oTD.UIAppend(TTHashtag);                              // add ui object to source data object (CTableData)
       TTHashtag.Render();                                   // render table
+
+      // Create delete all button
+      let eSection = TTHashtag.GetSection("body");
+      let eButton = document.createElement("span");
+      eButton.className = "tag is-black is-medium";
+      eButton.style.cssText = "margin: 2px; cursor: pointer;"
+      eButton.innerText = "Radera alla";
+      eButton.dataset.command = "all";
+      eSection.appendChild( eButton );
+
    }
 
    /**
@@ -1223,10 +1317,15 @@ export class CPage {
     * @param {string} sQuery query that conditions are removed from
     * @param {string | string[]} _Uuid [description]
     */
-   QONDITIONRemove( sQuery: string, _Uuid: string | string[] ) {
+   QONDITIONRemove( sQuery: string, _Uuid?: string | string[] ) {
       let sXml;
       let request = this.app.request;
       let oCommand: {[key:string]: string|number} = { command: "delete_condition_from_query get_result get_query_conditions", query: sQuery, set: "vote", count: 100, format: 1, start: 0 };
+
+      if( _Uuid === undefined ) {  // no uuid, then delete all
+         request.Get("SCRIPT_Run", { file: "PAGE_result.lua", hint: sQuery, json: request.GetJson(oCommand) }, sXml);
+         return;
+      }
 
       if( typeof _Uuid === "string" ) {
          oCommand.uuid = _Uuid

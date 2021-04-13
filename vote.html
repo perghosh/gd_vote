@@ -92,16 +92,16 @@ div[data-section="container"]
                <div id="idTopLogin" class="content is-primary"></div>
             </article>
             <article class="is-primary" data-index="2" data-state="head.hash">
-               <div id="idSearchHash" class="content is-primary is-size-2">Sök på hashtag ord</div>
+               <div id="idSearchHash" class="content is-primary is-size-2"></div>
             </article>
             <article class="is-primary" data-index="3" data-state="head.field">
-               <div id="idSearchField" class="content is-primary is-size-2">Sök på fält</div>
+               <div id="idSearchField" class="content is-primary is-size-2">Sök på fält (kommer snart)</div>
             </article>
             <article class="is-primary" data-index="4" data-state="head.area">
-               <div id="idSearchArea" class="content is-primary is-size-2">Sök på område</div>
+               <div id="idSearchArea" class="content is-primary is-size-2">Sök på område (kommer snart)</div>
             </article>
             <article class="is-primary" data-index="5" data-state="head.personal">
-               <div id="idSearchPersonal" class="content is-primary is-size-2">Sök på personliga intressen</div>
+               <div id="idSearchPersonal" class="content is-primary is-size-2">Sök på personliga intressen (kommer snart)</div>
             </article>
          </div>
       </div>
@@ -122,7 +122,7 @@ div[data-section="container"]
             </span>
          </div>
          <div class="navbar-item">
-            <span id="idPollHashtag">
+            <span id="idPollHashtag" style="max-width: 480px;">
 
             </span>
          </div>
@@ -153,11 +153,16 @@ div[data-section="container"]
             <article class="panel has-background-white" data-section="link" style="display: none; margin-top: 1em; padding: 5px;">
                <p class="panel-heading" data-translate="page.vote.TitleLinks">Länkar</p>
             </article>               
+            <!-- Present poll result, after voter has voted or setting filter from vote count -->
+            <article class="panel has-background-white" data-section="result" style="display: none; margin-top: 1em; padding: 5px;">
+            </article>
          </div>
 
          <div id="idContent" data-section="content">
+            <!-- Vote section, here voter are able to vote -->
             <article id="idPollVote" class="box is-active" data-index="1" data-state="body.vote">
             </article>
+            <!-- Vote count is where votes for each answer is shown -->
             <article id="idPollCount" class="box" data-index="2" data-state="body.count">
             </article>
          </div>
