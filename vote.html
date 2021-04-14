@@ -175,6 +175,12 @@ div[data-section="container"]
          window.app = new CApplication({ callback_action: PAGE_Callback });
          window.app.Initialize();
          //window.app.page.SetCallback( PAGE_Callback );
+
+         // TODO: activate filter search, remove this when test is over
+         window.setTimeout( function() {
+            let eTab = document.getElementById("idTabSearch").querySelector('[data-index="2"]');
+            eTab.click();
+         }, 2000);
       }
 
       /**

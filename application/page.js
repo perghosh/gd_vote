@@ -29,6 +29,9 @@
 | RESULTCreateQuestionPanel | Create panels for each question that belongs to current selected poll. Like containers for selectable votes |
 | RESULTCreateVoteCount | Create markup showing vote count on each answer for poll question |
 | CONDITIONListHashtags |  List hash tags conditions that filters poll, needed to enable removal of filters |
+| CONDITIONMarkFilterVote |  Mark items that has been filtered |
+| ELEMENTGetFilterButton |  Get button that adds or removes filter from poll result |
+
 |||
 */
 import { CTableData, enumReturn } from "./../library/TableData.js";
@@ -332,6 +335,9 @@ export class CPage {
     ProcessResponse(eItem, sName, sHint) {
         let oResult = JSON.parse(eItem.textContent);
         switch (sName) {
+            case "delete_condition":
+                //if( sHint === "poll_answer_filtercount")
+                break;
             case "result":
                 {
                     const sQueryName = oResult.name; // get query name
@@ -395,6 +401,8 @@ export class CPage {
             case "query_conditions":
                 if (sHint === "poll_list")
                     this.CONDITIONListHashtags("idPollHashtag", oResult);
+                else if (sHint === "poll_answer_filtercount")
+                    this.CONDITIONMarkFilterVote(oResult);
                 break;
             case "message":
                 const sType = oResult.type;
@@ -489,19 +497,26 @@ export class CPage {
     }
     QUERYGetPollFilterCount(_1) {
         let request = this.app.request;
+        const sQuery = "poll_answer_filtercount";
         let aCondition;
-        let oCommand = { command: "add_condition_to_query get_result", query: "poll_answer_filtercount", set: "vote", count: 100, format: 1, start: 0 };
+        let oCommand = { command: "add_condition_to_query get_result", query: sQuery, set: "vote", count: 100, format: 1, start: 0 };
         if (typeof _1 === "number") {
             aCondition = [{ table: "TPoll1", id: "PollK", value: _1 }];
             oCommand.delete = 1;
         }
         else {
-            if (typeof _1.answer === "number")
+            if (typeof _1.answer === "number") {
                 aCondition = [{ table: "TPollVote1", id: "TieFilterAnswer", value: _1.answer }];
+                oCommand.command = oCommand.command += " get_query_conditions";
+            }
+            else if (typeof _1.condition === "string") {
+                oCommand.command = "delete_condition_from_query get_result get_query_conditions";
+                oCommand.uuid = _1.condition;
+            }
         }
         let oQuery = new CQuery({ conditions: aCondition });
         let sXml = oQuery.CONDITIONGetXml();
-        request.Get("SCRIPT_Run", { file: "PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
+        request.Get("SCRIPT_Run", { file: "PAGE_result.lua", hint: sQuery, json: request.GetJson(oCommand) }, sXml);
     }
     /**
      * Return hashtags for selected poll
@@ -842,13 +857,12 @@ export class CPage {
         let oTD = new CTableData({ id: oResult.id, name: oResult.name });
         CPage.ReadColumnInformationFromHeader(oTD, oResult.table.header);
         oTD.ReadArray(oResult.table.body, { begin: 0 });
-        const aHeader = oResult.table.header;
-        CPage.ReadColumnInformationFromHeader(oTD, aHeader, (iIndex, oColumn, oTD) => {
-            if (oColumn.key) {
-                oTD.COLUMNSetPropertyValue(iIndex, "position.hide", true);
-            }
-        });
+        oTD.COLUMNSetPropertyValue("PollQuestionK", "position.hide", true);
         oTD.COLUMNSetPropertyValue("PollVoteK", "position.hide", false);
+        oTD.COLUMNSetPropertyValue("Question", "alias", "Fråga");
+        oTD.COLUMNSetPropertyValue("Answer", "alias", "Svar");
+        oTD.COLUMNSetPropertyValue("PollVoteK", "alias", "Antal röster");
+        oTD.COLUMNSetType("PollVoteK", "number");
         let eResult = eRoot.querySelector('[data-section="result"]');
         eResult.innerHTML = "";
         let oStyle = {
@@ -867,6 +881,33 @@ export class CPage {
         };
         let oTT = new CUITableText(options);
         oTD.UIAppend(oTT);
+        oTT.COLUMNSetRenderer(0, (e, v, a) => {
+            const iRow = a[0][0];
+            if (iRow > 0) {
+                //check if value is same as value in previous row
+                const sRowBefore = oTT.GetBodyValue(iRow - 1, 0);
+                if (sRowBefore === v)
+                    return;
+            }
+            let eB = document.createElement("b");
+            eB.innerText = v;
+            e.appendChild(eB);
+            //(<HTMLElement>e).innerText = <string>v;
+            /*
+                     let eCheck = <HTMLElement>e.querySelector("div");
+                     let sChecked = "";
+                     if(v === "1" || v === 1) sChecked = "checked";
+                     let eDiv = document.createElement("div");
+                     eDiv.innerHTML = `
+            <label class="vote-check" data-style="rounded" data-color="green" data-size="lg">
+            <input ${sChecked} type="checkbox" data-value="1" data-commit="1" value="1">
+            <span class="toggle">
+            <span class="switch"></span>
+            </span>
+            </label>`;
+                     e.appendChild(eDiv);
+                     */
+        });
         oTT.Render();
         eResult.style.display = "block"; // show result
     }
@@ -925,7 +966,8 @@ export class CPage {
             let eSection = document.createElement("section");
             eSection.dataset.question = iQuestion.toString();
             const sName = aRow[1];
-            eSection.className = "block section";
+            eSection.className = "block";
+            eSection.style.margin = "1em";
             const iPollIndex = i + 1; // Index for poll query
             eSection.innerHTML = `<header class="title is-3">${iPollIndex}: ${sName}</header><article style="display: block;"></article>`;
             eQuestion.appendChild(eSection);
@@ -1051,15 +1093,23 @@ export class CPage {
         let oTT = new CUITableText(options);
         oTD.UIAppend(oTT);
         oTT.COLUMNSetRenderer(0, (e, v, a) => {
-            e.innerHTML = `<button class="button is-light is-small" data-answer="${v}">Filtrera bort</button>`;
+            e.innerHTML = `<button class="button is-primary is-light" data-answer="${v}">Ta bort</button>`;
         });
         oTT.Render();
         eSection = oTT.GetSection("body");
         eSection.addEventListener("click", (e) => {
             const eButton = e.srcElement;
             if (eButton.tagName === "BUTTON") {
-                const iAnswer = parseInt(eButton.dataset.answer, 10);
-                this.QUERYGetPollFilterCount({ answer: iAnswer });
+                if (typeof eButton.dataset.uuid === "string") {
+                    this.QUERYGetPollFilterCount({ condition: eButton.dataset.uuid });
+                    eButton.className = "button is-primary is-light";
+                    eButton.innerText = "Ta bort";
+                    delete eButton.dataset.uuid;
+                }
+                else {
+                    const iAnswer = parseInt(eButton.dataset.answer, 10);
+                    this.QUERYGetPollFilterCount({ answer: iAnswer });
+                }
             }
         });
     }
@@ -1126,6 +1176,21 @@ export class CPage {
         eButton.dataset.command = "all";
         eSection.appendChild(eButton);
     }
+    CONDITIONMarkFilterVote(oResult) {
+        let oTD = new CTableData();
+        oTD.ReadObjects(oResult);
+        let i = oTD.ROWGetCount();
+        while (--i >= 0) {
+            const sId = oTD.CELLGetValue(i, "condition_id");
+            if (sId === "TieFilterAnswer") {
+                // find button with filter
+                let eButton = this.ELEMENTGetFilterButton(parseInt(oTD.CELLGetValue(i, "value"), 10));
+                eButton.className = "button is-warning is-light";
+                eButton.innerText = "Lägg till";
+                eButton.dataset.uuid = oTD.CELLGetValue(i, "uuid");
+            }
+        }
+    }
     /**
      * Remove condition from poll_list query
      * @param {string} sQuery query that conditions are removed from
@@ -1143,6 +1208,11 @@ export class CPage {
             oCommand.uuid = _Uuid;
         }
         request.Get("SCRIPT_Run", { file: "PAGE_result.lua", hint: sQuery, json: request.GetJson(oCommand) }, sXml);
+    }
+    ELEMENTGetFilterButton(iAnswer) {
+        const eArticle = document.getElementById("idPollCount");
+        const eButton = eArticle.querySelector(`button[data-answer="${iAnswer}"]`);
+        return eButton;
     }
     /**
      *
