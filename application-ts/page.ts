@@ -19,6 +19,10 @@
 | QUERYGetPollLinks | Get links for poll. Query used is `poll_links` |
 | QUERYGetPollFilterCount | Get poll result (votes are counted) |
 | QUERYGetPollHashtags | Get hash tags for poll or all poll hash tags. Query used is `poll_hashtags` |
+
+
+
+
 | RESULTCreatePollList | Create drop-down with active polls |
 | RESULTCreateLogin | Create login section |
 | RESULTCreateFindVoter | Result from finding voter, this is called if user tries to login |
@@ -27,6 +31,7 @@
 | RESULTCreatePollOverviewLinks | Process result from `poll_links` and render these for user |
 | RESULTCreatePollFilterCount | Create table with poll result |
 | RESULTCreateQuestionPanel | Create panels for each question that belongs to current selected poll. Like containers for selectable votes |
+| RESULTCreateVote | Create vote for poll question. Creates markup for possible answers to poll question |
 | RESULTCreateVoteCount | Create markup showing vote count on each answer for poll question |
 | CONDITIONListHashtags |  List hash tags conditions that filters poll, needed to enable removal of filters |
 | CONDITIONMarkFilterVote |  Mark items that has been filtered |
@@ -120,7 +125,7 @@ export class CPage {
 
       this.m_aVoter = [-1,"",""];         // no voter (-1)
       this.m_aVoteHistory = [];
-      //this.HISTORYSerialize(false);
+      this.HISTORYSerialize(false);
    }
 
    get app() { return this.m_oApplication; }                                   // get application object
@@ -236,6 +241,10 @@ export class CPage {
       }
    }
 
+   /**
+    * Call owner to page, owner is probably a callback in the html page this page
+    * @param sMessage
+    */
    CallOwner( sMessage ) {
       if( this.m_callAction ) this.m_callAction.call( this, sMessage );
    }
@@ -438,10 +447,6 @@ export class CPage {
                   }
 
                   this.WalkNextState(); // Go to next step in active state
-
-                  //let aQuery = this.m_oPageState.GetOngoingQuery();
-                  //aQuery
-
                }
             }
 
@@ -482,8 +487,8 @@ export class CPage {
                if(sQueryName === "poll_vote") {
                   this.OpenMessage("Din röst har blivit registrerad!")
                   if(this.poll.vote > 0) {
-                     //this.m_aVoteHistory.push(this.poll.vote);
-                     //this.HISTORYSerialize( true );
+                     this.m_aVoteHistory.push(this.poll.vote);
+                     this.HISTORYSerialize( true );
                      this.QUERYGetPollFilterCount( this.GetActivePoll() );
                   }
                   this.poll.vote = -1;
@@ -504,6 +509,10 @@ export class CPage {
       return this.m_aVoteHistory.findIndex( i => i === iPoll ) !== -1 ? true : false;
    }
 
+   /**
+    * Serialize polls that user has voted  for
+    * @param bSave if true then save poll ids, if false load poll ids
+    */
    HISTORYSerialize(bSave: boolean) {
       if(bSave === true) {
          localStorage.setItem( "poll_votes", JSON.stringify( this.m_aVoteHistory ) );
@@ -929,8 +938,6 @@ export class CPage {
          this.poll.count = iIpCount;
       }
 
-      this.poll.count = 0;
-
       if(iQuestionCount > 0) {
          // ## Generate title for poll
          let eTitle = <HTMLElement>eRoot.querySelector("[data-title]");
@@ -1160,11 +1167,6 @@ export class CPage {
       // ## Find container element to question
       let eSection = <HTMLElement>eRoot.querySelector(`section[data-question="${iQuestion}"]`);
       let eArticle = <HTMLElement>eSection.querySelector("article");
-
-
-      //let TDVote = new CTableData({ id: oResult.id, name: oResult.name, external: { max: 1, min: 1 } });
-      //aQuestion[ 3 ] = TDVote;
-
 
 
       let oStyle = {
@@ -1405,6 +1407,10 @@ export class CPage {
       request.Get("SCRIPT_Run", { file: "PAGE_result.lua", hint: sQuery, json: request.GetJson(oCommand) }, sXml);
    }
 
+   /**
+    * Return element for filter button
+    * @param iAnswer key to active answer
+    */
    ELEMENTGetFilterButton( iAnswer: number ): HTMLButtonElement {
       const eArticle = document.getElementById("idPollCount");
       const eButton = eArticle.querySelector(`button[data-answer="${iAnswer}"]`);
