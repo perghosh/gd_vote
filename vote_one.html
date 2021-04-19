@@ -47,10 +47,11 @@ div[data-section="container"]
       [data-index="2"]
 -->
       <div data-section="container" data-page-type="vote">
-         <div data-section="tab" class="tabs is-small" style="height: 5em;">
+         <div data-section="tab" class="tabs is-medium">
             <ul>
                <li class="is-active" data-index="1"><a data-translate="page.vote.Vote">Rösta</a></li>
                <li data-index="2"><a data-translate="page.vote.Result">Resultat</a></li>
+               <li data-index="3"><a data-translate="page.vote.Search">Sök</a></li>
             </ul>
          </div>
 
@@ -61,8 +62,13 @@ div[data-section="container"]
             <article class="panel has-background-white" data-section="link" style="display: none; margin-top: 1em; padding: 5px;">
                <p class="panel-heading" data-translate="page.vote.TitleLinks">Länkar</p>
             </article>               
+
             <!-- Present poll result, after voter has voted or setting filter from vote count -->
             <article class="panel has-background-white" data-section="result" style="display: none; margin-top: 1em; padding: 5px;">
+            </article>
+
+            <!-- Present poll result as bar chart, one for each question-->
+            <article class="panel" data-section="d3bars" style="width:  100%; margin-top: 1em; padding: 5px;">
             </article>
          </div>
 
@@ -72,6 +78,10 @@ div[data-section="container"]
             </article>
             <!-- Vote count is where votes for each answer is shown -->
             <article id="idPollCount" class="box" data-index="2" data-state="body.count">
+            </article>
+
+            <!-- Search for poll -->
+            <article id="idPollSearch" class="box" data-index="3" data-state="body.search">
             </article>
          </div>
       </div>
@@ -89,10 +99,25 @@ div[data-section="container"]
        * @param sMessage type of operation
        */
       function PAGE_Callback(sOperation) {
-         if( sOperation === "load" ) {
+         if( sOperation === "load" ) {                      // queries are loaded for user, here you can sart
             //this.QUERYGetLogin();
             //this.QUERYGetPollList();
-            this.SetActivePoll( 26 );
+
+
+            const sQueryString = window.location.search;
+            const oParams = new URLSearchParams(sQueryString);
+            if(oParams.has("poll") === false) {
+               this.OpenMessage("Saknar id till aktiv fråga");
+               return;
+            }
+
+            const iPoll = parseInt( oParams.get("poll"), 10 );
+            if(isNaN(iPoll)) {
+               this.OpenMessage("Felaktigt format för id till aktiv fråga");
+               return;
+            }
+
+            this.SetActivePoll( iPoll );
          }
          else if( sOperation === "insert-voter" ) {
             window.app.page.OpenMessage("Användaren är registrerad och kan rösta efter att ha loggat in igen!");
@@ -236,6 +261,9 @@ div[data-section="container"]
    <meta charset="iso-8859-1">
    <title>Vote</title>
    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.1/css/bulma.min.css">
+   <!-- <script src="https://d3js.org/d3.v6.min.js"></script> -->
+   <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/6.7.0/d3.js"></script>
+   
    <style>
       :root {
          --gd-blue: #0d6efd;
@@ -298,6 +326,16 @@ div[data-section="container"]
       div[data-section="content"] article.is-active {
          display: block;
       }
+
+      .d3_bar, .d3_label {
+        font-size: 10pt;
+        font-weight: bold;
+        font-family: Arial, sans-serif;
+      }
+      
+      .malebar {
+        fill: steelblue;
+      }      
 
 
       /* Customizable styles  https://github.com/adamculpepper/toggle-switchy*/

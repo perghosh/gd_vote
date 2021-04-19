@@ -1184,6 +1184,10 @@ export class CPage {
         eButton.dataset.command = "all";
         eSection.appendChild(eButton);
     }
+    /**
+     * Mark condition, user need to know what is filtered on
+     * @param {any} oResult condition items for query
+     */
     CONDITIONMarkFilterVote(oResult) {
         let oTD = new CTableData();
         oTD.ReadObjects(oResult);

@@ -1,9 +1,8 @@
 ﻿/*
-# Navigate 
-   ## Functions
-   SetActivePoll - Calling this method triggers a chain of operations that will display needed information about active poll
-   OpenMessage - Open a new message for user
-   ProcessResponse - Process responses from server
+
+pageone = page logic for managing one vote, user can not select any votes. active vote is sent as parameter
+
+# Navigate
 
 |Name|Description
 |:-|:-|
@@ -16,7 +15,6 @@
 | QUERYGetPollOverview | Get information about selected poll. query = poll_overview. query = `poll_overview` |
 | QUERYGetPollLinks | Get links for poll. Query used is `poll_links` |
 | QUERYGetPollFilterCount | Get poll result (votes are counted) |
-| QUERYGetPollHashtags | Get hash tags for poll or all poll hash tags. Query used is `poll_hashtags` |
 | RESULTCreatePollList | Create drop-down with active polls |
 | RESULTCreateLogin | Create login section |
 | RESULTCreateFindVoter | Result from finding voter, this is called if user tries to login |
@@ -25,6 +23,7 @@
 | RESULTCreatePollOverviewLinks | Process result from `poll_links` and render these for user |
 | RESULTCreatePollFilterCount | Create table with poll result |
 | RESULTCreateQuestionPanel | Create panels for each question that belongs to current selected poll. Like containers for selectable votes |
+| RESULTCreateVote | Create vote for poll question. Creates markup for possible answers to poll question |
 | RESULTCreateVoteCount | Create markup showing vote count on each answer for poll question |
 | CONDITIONMarkFilterVote |  Mark items that has been filtered |
 | ELEMENTGetFilterButton |  Get button that adds or removes filter from poll result |
@@ -44,6 +43,7 @@ import { CUITableText, enumState, uitabledata_construct } from "./../library/UIT
 import { CQuery } from "./../server/Query.js"
 import { CApplication } from "./application.js"
 import { CPageSuper, CPageState } from "./pagesuper.js"
+import { CD3Bar } from "./pageone_d3.js"
 
 namespace details {
    export const enum enumQueryState { send = 0, waiting = 1, delivered = 2, conditions = 10}
@@ -58,6 +58,8 @@ namespace details {
 
 
 export class CPageOne extends CPageSuper {
+   m_oD3Bar: CD3Bar;                // manage d3 bar for vote result
+   m_bFilterConditionCount: boolean; // there are filter conditions
    m_aPageState: CPageState[];
    m_oPageState: CPageState;        // current page state that is being processed
    /**
@@ -74,18 +76,13 @@ export class CPageOne extends CPageSuper {
    m_aVoter: [ number, string, string ];// key, alias and name for current voter
    m_aVoteHistory: number[];        // Local vote history on computer, this is to avoid abuse but is only for the current browser
 
-   // ## One single poll can have one or more questions. Each questions has one or more answers. 
-   // ## When poll is selected page gets information about each question in poll and render information 
-   // ## for each question in poll. QUESTION_STATE has states to know in what type of information that is needed.
-   // State for each question in poll
-   // NO_RESULT = no information about question, need to get it from server
-   // WAITING_FOR_RESULT = waits for result from server about poll question
-   // RESULT_DELIVERED = Result about question is returned from server
-   // VOTE_READY_TO_SEND = Vote is ready to send to server, voter has selected answers
-
    constructor(oApplication, oOptions?: details.page_construct) {
       super( oApplication, oOptions );
       const o = oOptions || {};
+
+      this.m_oD3Bar = new CD3Bar();
+
+      this.m_bFilterConditionCount = false;
 
       this.m_oPoll = { poll: -1, vote: -1, count: 0 };
       this.m_oState = o.state || {};
@@ -93,7 +90,8 @@ export class CPageOne extends CPageSuper {
 
       this.m_aPageState = [
          new CPageState({ section: "body", name: "vote", container: document.getElementById("idPollVote"), query: [ [ "poll_question_list", details.enumQueryState.send, [] ], [ "poll_answer", details.enumQueryState.send, [] ] ] }),
-         new CPageState({ section: "body", name: "count", container: document.getElementById("idPollCount"), query: [ [ "poll_question_list", details.enumQueryState.send, [] ], [ "poll_answer_count", details.enumQueryState.send, [] ] ] })
+         new CPageState({ section: "body", name: "count", container: document.getElementById("idPollCount"), query: [ [ "poll_question_list", details.enumQueryState.send, [] ], [ "poll_answer_count", details.enumQueryState.send, [] ] ] }),
+         new CPageState({ section: "body", name: "search", container: document.getElementById("idPollSearch"), query: [ [ "poll_search", details.enumQueryState.send, [] ] ] })
       ];
 
       this.m_oElement = {
@@ -118,7 +116,7 @@ export class CPageOne extends CPageSuper {
 
    get view_mode() { return this.m_sViewMode; }
    set view_mode(sMode) {
-      console.assert(sMode === "vote" || sMode === "count", "Invalid view mode: " + sMode);
+      console.assert(sMode === "vote" || sMode === "count" || sMode === "search", "Invalid view mode: " + sMode);
       this.m_sViewMode = sMode;
    }
 
@@ -133,6 +131,7 @@ export class CPageOne extends CPageSuper {
     */
    SetActivePoll(iActivePoll?: number, sName?: string ) {
       this.CloseQuestions();
+      if( this.m_oD3Bar ) this.m_oD3Bar.DeleteQuestion();
 
       if( iActivePoll !== this.GetActivePoll() ) {
          (<HTMLElement>document.getElementById( "idPollOverview" ).querySelector('[data-section="result"]')).style.display = "none";
@@ -155,8 +154,6 @@ export class CPageOne extends CPageSuper {
       }
 
       this.WalkNextState();
-
-      if( this.view_mode === "count" ) this.QUERYGetPollFilterCount( iActivePoll );
    }
 
 
@@ -215,6 +212,7 @@ export class CPageOne extends CPageSuper {
       if( aQuery === null ) {
          this.m_oPageState.Reset();                         // reset state (set queries to be sent and removes conditions)
          this.m_oPageState = null;
+         this.QUERYGetPollFilterCount( this.GetActivePoll() );
          return;         
       }
 
@@ -253,7 +251,11 @@ export class CPageOne extends CPageSuper {
          request.Get("SCRIPT_Run", { file: "PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
          aQuery[ 1 ] = details.enumQueryState.waiting;                        // change state to waiting
       }
-      else this.m_oPageState = null;
+      else {
+         console.assert(false, "we should not go here");
+         this.m_oPageState = null;
+         this.m_oD3Bar.Render( this.m_bFilterConditionCount );
+      }
    }
 
 
@@ -380,6 +382,9 @@ export class CPageOne extends CPageSuper {
          case "load_if_not_found":
             this.CallOwner("load");
             break;
+         case "query_conditions":
+            if( sHint === "poll_answer_filtercount") this.CONDITIONMarkFilterVote( oResult );
+            break;
          case "message":
             const sType = oResult.type;
             if(sType === "add_rows") {
@@ -456,16 +461,17 @@ export class CPageOne extends CPageSuper {
       else {
          if( typeof _1.answer === "number" ) {
             aCondition = [ { table: "TPollVote1", id: "TieFilterAnswer", value: _1.answer } ];
-            oCommand.command = oCommand.command += " get_query_conditions";
+            oCommand.command = "add_condition_to_query get_query_conditions get_result";
          }
          else if( typeof _1.condition === "string" ) {
-            oCommand.command = "delete_condition_from_query get_result get_query_conditions";
+            oCommand.command = "delete_condition_from_query get_query_conditions get_result";
             oCommand.uuid = _1.condition;
          }
       }
       let oQuery = new CQuery( { conditions: aCondition });
       let sXml = <string>oQuery.CONDITIONGetXml();
 
+      this.m_bFilterConditionCount = false;
       request.Get("SCRIPT_Run", { file: "PAGE_result.lua", hint: sQuery, json: request.GetJson(oCommand) }, sXml);
    }
 
@@ -508,6 +514,10 @@ export class CPageOne extends CPageSuper {
       if(this.IsVoter() === false && iIpCount > 0) {
          this.poll.count = iIpCount;
       }
+
+
+      this.poll.count = 0; // TODO: remove this when voter should be blocked to vote more than once
+
 
       if(iQuestionCount > 0) {
          // ## Generate title for poll
@@ -592,6 +602,17 @@ export class CPageOne extends CPageSuper {
       let TTVote = new CUITableText(<uitabledata_construct><unknown>options);
       TDVote.UIAppend(TTVote);
 
+      // add to our voter count chart data
+      for( let i = 0, iTo = TDVote.ROWGetCount(); i < iTo; i++ ) {
+         this.m_oD3Bar.AddAnswer( iQuestion, [
+            <number>TDVote.CELLGetValue(i,"PollAnswerK"),
+            <string>TDVote.CELLGetValue(i,"FName"),
+            0,0
+            //Math.floor(Math.random() * 100),0
+         ]);
+      }
+
+
       TTVote.COLUMNSetRenderer(0, (e, v, a) => {
          let eCheck = <HTMLElement>e.querySelector("div");
          let sChecked = "";
@@ -666,6 +687,27 @@ export class CPageOne extends CPageSuper {
       oTD.COLUMNSetPropertyValue("PollVoteK", "alias", "Antal röster");
       oTD.COLUMNSetType( "PollVoteK", "number" );
 
+      if( this.m_bFilterConditionCount === true ) this.m_oD3Bar.ResetFilterCount();
+
+      // Update bar chart with values from filter
+      for( let i = 0, iTo = oTD.ROWGetCount(); i < iTo; i++ ) {
+         let a: [number,number] = [undefined, undefined];
+         if( this.m_bFilterConditionCount === true ) {
+            //a[1] = Math.floor(Math.random() * 25);
+            a[1] = <number>oTD.CELLGetValue(i,"Count");
+         }
+         else {
+            //a[0] = Math.floor(Math.random() * 100);
+            a[0] = <number>oTD.CELLGetValue(i,"Count"); 
+         }
+         this.m_oD3Bar.SetAnswerCount( 
+            <number>oTD.CELLGetValue(i,"PollQuestionK"), 
+            <string>oTD.CELLGetValue(i,"Answer"), 
+            a //<number>oTD.CELLGetValue(i,"Count") 
+         );
+      }
+
+
       let eResult = <HTMLElement>eRoot.querySelector('[data-section="result"]');
       eResult.innerHTML = "";
 
@@ -699,25 +741,11 @@ export class CPageOne extends CPageSuper {
          let eB = document.createElement("b");
          eB.innerText = <string>v;
          (<HTMLElement>e).appendChild( eB );
-         //(<HTMLElement>e).innerText = <string>v;
-/*
-         let eCheck = <HTMLElement>e.querySelector("div");
-         let sChecked = "";
-         if(v === "1" || v === 1) sChecked = "checked";
-         let eDiv = document.createElement("div");
-         eDiv.innerHTML = `
-<label class="vote-check" data-style="rounded" data-color="green" data-size="lg">
-<input ${sChecked} type="checkbox" data-value="1" data-commit="1" value="1">
-<span class="toggle">
-<span class="switch"></span>
-</span>
-</label>`;
-         e.appendChild(eDiv);
-         */
       });
 
 
       oTT.Render();
+      this.m_oD3Bar.Render( this.m_bFilterConditionCount );
       eResult.style.display = "block";                     // show result
    }
 
@@ -773,6 +801,10 @@ export class CPageOne extends CPageSuper {
       CPageSuper.ReadColumnInformationFromHeader(oTD, oResult.table.header);
       oTD.ReadArray(oResult.table.body, { begin: 0 });
 
+      let eD3Bars = <HTMLElement>document.getElementById("idPollOverview").querySelector('[data-section="d3bars"]');
+      eD3Bars.innerHTML = "";
+
+
       let aBody = oTD.GetData()[ 0 ];
       let aCondition: details.condition[] = [];
       aBody.forEach((aRow, i) => {
@@ -787,6 +819,18 @@ export class CPageOne extends CPageSuper {
          const iPollIndex = i + 1; // Index for poll query
          eSection.innerHTML = `<header class="title is-3">${iPollIndex}: ${sName}</header><article style="display: block;"></article>`;
          eQuestion.appendChild(eSection);
+
+         eSection = <HTMLElement>document.createElement("section");
+         eSection.className = "block box";
+         eSection.style.padding = "0.5em";
+         eSection.innerHTML = `<div class="is-size-6 has-text-weight-semibold" data-type="title"></div><div data-type="chart"></div>`;
+         let eTitle = <HTMLElement>eSection.querySelector('[data-type="title"]');
+         eTitle.innerText = <string>sName;
+
+         let eChart = <HTMLElement>eSection.querySelector('[data-type="chart"]');
+         this.m_oD3Bar.AddQuestion( iQuestion, <string>sName, eChart );     // Add question to d3 chart
+
+         eD3Bars.appendChild( eSection );
       });
 
       this.m_oPageState.SetCondition( aCondition );
@@ -817,6 +861,17 @@ export class CPageOne extends CPageSuper {
       oTD.COLUMNSetPropertyValue("ID_Answer", "position.hide", false);
 
       let iQuestion: number = <number>oTD.CELLGetValue(0,0);
+
+      // add to our voter count chart data
+      for( let i = 0, iTo = oTD.ROWGetCount(); i < iTo; i++ ) {
+         this.m_oD3Bar.AddAnswer( iQuestion, [
+            <number>oTD.CELLGetValue(i,"PollAnswerK"),
+            <string>oTD.CELLGetValue(i,"FName"),
+            //Math.floor(Math.random() * 100),
+            0,
+            0
+         ]);
+      }
 
       // ## Find container element to question
       let eSection = <HTMLElement>eRoot.querySelector(`section[data-question="${iQuestion}"]`);
@@ -894,6 +949,51 @@ export class CPageOne extends CPageSuper {
    }
 
    /**
+    * Mark condition, user need to know what is filtered on
+    * @param {any} oResult condition items for query
+    */
+   CONDITIONMarkFilterVote( oResult: any ) {
+      let oTD = new CTableData();
+      oTD.ReadObjects( oResult );
+      this.m_bFilterConditionCount = false;
+      let i = oTD.ROWGetCount();
+      while( --i >= 0 ) {
+         const sId = oTD.CELLGetValue( i, "condition_id" );
+         if( sId === "TieFilterAnswer" ) {
+            this.m_bFilterConditionCount = true;
+            // find button with filter
+            let eButton = this.ELEMENTGetFilterButton( parseInt( <string>oTD.CELLGetValue( i, "value" ), 10 ) );
+            eButton.className = "button is-warning is-light";
+            eButton.innerText = "Lägg till";
+            eButton.dataset.uuid = <string>oTD.CELLGetValue( i, "uuid" );
+         }
+      }
+   }
+
+   /**
+    * Remove condition from poll_list query
+    * @param {string} sQuery query that conditions are removed from
+    * @param {string | string[]} _Uuid [description]
+    */
+   QONDITIONRemove( sQuery: string, _Uuid?: string | string[] ) {
+      let sXml;
+      let request = this.app.request;
+      let oCommand: {[key:string]: string|number} = { command: "delete_condition_from_query get_result get_query_conditions", query: sQuery, set: "vote", count: 100, format: 1, start: 0 };
+
+      if( _Uuid === undefined ) {  // no uuid, then delete all
+         request.Get("SCRIPT_Run", { file: "PAGE_result.lua", hint: sQuery, json: request.GetJson(oCommand) }, sXml);
+         return;
+      }
+
+      if( typeof _Uuid === "string" ) {
+         oCommand.uuid = _Uuid
+      }
+      
+      request.Get("SCRIPT_Run", { file: "PAGE_result.lua", hint: sQuery, json: request.GetJson(oCommand) }, sXml);
+   }
+
+
+   /**
     * Return element for filter button
     * @param iAnswer key to active answer
     */
@@ -905,3 +1005,4 @@ export class CPageOne extends CPageSuper {
 
 
 }
+

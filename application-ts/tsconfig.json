@@ -1,6 +1,7 @@
 {
    "compileOnSave": true,
    "compilerOptions": {
+      "baseUrl": ".",
       "module": "ESNext",
       "target": "ESNext",
       "lib": [ "ES6", "DOM", "ESNext" ],
@@ -9,5 +10,4 @@
    "exclude": [
       // "node_modules"
    ]
-
 }

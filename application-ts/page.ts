@@ -1368,6 +1368,10 @@ export class CPage {
 
    }
 
+   /**
+    * Mark condition, user need to know what is filtered on
+    * @param {any} oResult condition items for query
+    */
    CONDITIONMarkFilterVote( oResult: any ) {
       let oTD = new CTableData();
       oTD.ReadObjects( oResult );
