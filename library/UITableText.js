@@ -1411,11 +1411,26 @@ export class CUITableText {
         aSelected = aSelected || this.selected;
         if (aSelected.length === 0)
             return;
+        let EVT; // EventDataTable
         let sStyle = CTableData.GetPropertyValue(this.m_oStyle, false, "cell_selected") || ""; // style
         let sClass = CTableData.GetPropertyValue(this.m_oStyle, false, "class_cell_selected") || ""; // class
+        let bCall = this.m_acallRender.length ? true : false;
+        if (bCall === true) {
+            EVT = this._get_triggerdata();
+        }
         aSelected.forEach((a) => {
             let e = this.ELEMENTGetCell(a);
-            if (e) {
+            let bRender = true;
+            if (bCall) {
+                EVT.information = a;
+                EVT.eElement = e;
+                for (let j = 0; j < this.m_acallRender.length; j++) {
+                    let b = this.m_acallRender[j].call(this, "beforeSelected", EVT, "body", this.data.COLUMNGet(this._column_in_data(a[1])));
+                    if (b === false)
+                        bRender = false;
+                }
+            }
+            if (e && bRender) {
                 if (sStyle)
                     e.style.cssText = sStyle;
                 if (sClass)
@@ -1426,8 +1441,21 @@ export class CUITableText {
     render_input() {
         this.INPUTMove(0 /* validate */);
         let sClass = CTableData.GetPropertyValue(this.m_oStyle, false, "class_cell_input") || CTableData.GetPropertyValue(this.m_oStyle, false, "class_selected");
+        const eElement = this.ELEMENTGetCellValue(this.m_aInput[2]);
+        let EVT; // EventDataTable
+        let bCall = this.m_acallRender.length ? true : false;
+        if (bCall === true) {
+            EVT = this._get_triggerdata();
+            EVT.information = this.m_aInput;
+            EVT.eElement = eElement;
+            for (let j = 0; j < this.m_acallRender.length; j++) {
+                let b = this.m_acallRender[j].call(this, "beforeInput", EVT, "body", this.data.COLUMNGet(this._column_in_data(this.m_aInput[1])));
+                if (b === false)
+                    return;
+            }
+        }
         if (sClass) {
-            this.ELEMENTGetCellValue(this.m_aInput[2]).classList.add(sClass);
+            eElement.classList.add(sClass);
         }
     }
     render_value_error(aValueError) {
@@ -1968,21 +1996,6 @@ export class CUITableText {
                     }
                 }
             }
-            //if(this.m_aInput = [ iR, iC, eElement ];)
-            /*
-            if(sType === "click" && this.m_aInput) {                             // if input, then position input on clicked cell
-               let aCell: [ number, number, unknown ] = this.GetRowCol(<HTMLElement>e.srcElement);
-               let aI = this.m_aInput;
-               if(aCell && (aCell[ 0 ] !== aI[ 0 ] || aCell[ 1 ] !== aI[ 1 ])) {
-                  aCell[ 2 ] = this.ELEMENTGetCell(aCell[ 0 ], aCell[ 1 ]);
-                  this.m_aInput = <[ number, number, HTMLElement ]>aCell;
-                  this.Render("body");
-               }
-               else {
-                  // TODO: Open edit
-               }
-            }
-            */
             else if (sType === "keydown" && this.m_aInput) {
                 let eMove;
                 if (e.keyCode === 9) {

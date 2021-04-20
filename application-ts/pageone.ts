@@ -25,8 +25,10 @@ pageone = page logic for managing one vote, user can not select any votes. activ
 | RESULTCreateQuestionPanel | Create panels for each question that belongs to current selected poll. Like containers for selectable votes |
 | RESULTCreateVote | Create vote for poll question. Creates markup for possible answers to poll question |
 | RESULTCreateVoteCount | Create markup showing vote count on each answer for poll question |
+| RESULTCreateSearch | Create search table used to select active poll |
 | CONDITIONMarkFilterVote |  Mark items that has been filtered |
-| ELEMENTGetFilterButton |  Get button that adds or removes filter from poll result |
+| WalkNextState | Walks queries used to collect information for active state |
+
 
 |||
 
@@ -36,7 +38,7 @@ https://dev.to/plebras/want-to-learn-d3-let-s-make-a-bar-chart-3o5n
 
 import { CTableData, CRowRows, enumMove, IUITableData, tabledata_column, tabledata_position, tabledata_format, enumReturn } from "./../library/TableData.js";
 import { edit } from "./../library/TableDataEdit.js";
-import { CTableDataTrigger, EventDataTable } from "./../library/TableDataTrigger.js";
+import { CTableDataTrigger, EventDataTable, enumTrigger } from "./../library/TableDataTrigger.js";
 
 
 import { CUITableText, enumState, uitabledata_construct } from "./../library/UITableText.js"
@@ -91,7 +93,8 @@ export class CPageOne extends CPageSuper {
       this.m_aPageState = [
          new CPageState({ section: "body", name: "vote", container: document.getElementById("idPollVote"), query: [ [ "poll_question_list", details.enumQueryState.send, [] ], [ "poll_answer", details.enumQueryState.send, [] ] ] }),
          new CPageState({ section: "body", name: "count", container: document.getElementById("idPollCount"), query: [ [ "poll_question_list", details.enumQueryState.send, [] ], [ "poll_answer_count", details.enumQueryState.send, [] ] ] }),
-         new CPageState({ section: "body", name: "search", container: document.getElementById("idPollSearch"), query: [ [ "poll_search", details.enumQueryState.send, [] ] ] })
+         new CPageState({ section: "body", name: "search", container: document.getElementById("idPollSearch"), isolated: true, query: [ [ "poll_search", details.enumQueryState.send, false ] ] }),
+         new CPageState({ section: "body", name: "select", container: null, query: [ [ "poll_question_list", details.enumQueryState.send, [] ], [ "poll_answer", details.enumQueryState.send, [] ] ] }),
       ];
 
       this.m_oElement = {
@@ -116,7 +119,7 @@ export class CPageOne extends CPageSuper {
 
    get view_mode() { return this.m_sViewMode; }
    set view_mode(sMode) {
-      console.assert(sMode === "vote" || sMode === "count" || sMode === "search", "Invalid view mode: " + sMode);
+      console.assert(sMode === "vote" || sMode === "count" || sMode === "search" || sMode === "select", "Invalid view mode: " + sMode);
       this.m_sViewMode = sMode;
    }
 
@@ -211,21 +214,31 @@ export class CPageOne extends CPageSuper {
       let aQuery = this.m_oPageState.GetOngoingQuery();     // returns first query where result hasn't been delivered
       if( aQuery === null ) {
          this.m_oPageState.Reset();                         // reset state (set queries to be sent and removes conditions)
-         this.m_oPageState = null;
-         this.QUERYGetPollFilterCount( this.GetActivePoll() );
+         if( this.m_oPageState.IsIsolated() === false ) {
+            this.m_oPageState = null;
+            this.QUERYGetPollFilterCount( this.GetActivePoll() );
+         }
+         else {
+            this.m_oPageState = null;
+         }
          return;         
       }
 
       if(aQuery[ 1 ] === details.enumQueryState.delivered) {
          let aCondition = aQuery[2];
-         let i = 0;
-         while( i < aCondition.length && aCondition[i].ready === true );
-         if(i < aCondition.length) { aCondition[ i ].ready = true; i++; }
+         if(typeof aCondition !== "boolean") {
+            let i = 0;
+            while(i < aCondition.length && aCondition[ i ].ready === true);
+            if(i < aCondition.length) { aCondition[ i ].ready = true; i++; }
 
-         // Check for more conditions?
-         if(i < aCondition.length) { aQuery[1] = details.enumQueryState.send; }
+            // Check for more conditions?
+            if(i < aCondition.length) { aQuery[ 1 ] = details.enumQueryState.send; }
+            else {
+               // get next non delivered query
+               aQuery = this.m_oPageState.GetOngoingQuery();
+            }
+         }
          else {
-            // get next non delivered query
             aQuery = this.m_oPageState.GetOngoingQuery();
          }
       }
@@ -233,21 +246,24 @@ export class CPageOne extends CPageSuper {
 
       if(aQuery && aQuery[ 1 ] === details.enumQueryState.send) {              // if query is in send state then send it
          // Get first filter that isn't sent
-         let aCondition = aQuery[ 2 ];
-
-         let oQuery = new CQuery();
-         let a = [];
-         for(let i = 0; i < aCondition.length; i++) {
-            let oC = aCondition[ i ];
-            if(oC.ready === false) {
-               oQuery.CONDITIONAdd( oC );
-               oC.ready = true;
-               break;
+         let aCondition = <details.condition[]>aQuery[ 2 ];
+         let sXml;
+         if( aCondition ) {
+            let oQuery = new CQuery();
+            let a = [];
+            for(let i = 0; i < aCondition.length; i++) {
+               let oC = aCondition[ i ];
+               if(oC.ready === false) {
+                  oQuery.CONDITIONAdd( oC );
+                  oC.ready = true;
+                  break;
+               }
             }
+            sXml = <string>oQuery.CONDITIONGetXml();
          }
-         let sXml = <string>oQuery.CONDITIONGetXml();
          const sQuery = aQuery[0];
          let oCommand = { command: "add_condition_to_query get_result", delete: 1, query: sQuery, set: "vote", count: 50, format: 1, start: 0 };
+         if( !sXml ) delete oCommand.delete;               // No condition then keep active conditions for query
          request.Get("SCRIPT_Run", { file: "PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
          aQuery[ 1 ] = details.enumQueryState.waiting;                        // change state to waiting
       }
@@ -349,18 +365,19 @@ export class CPageOne extends CPageSuper {
                      case "poll_question_list": this.RESULTCreateQuestionPanel( this.m_oPageState.container, oResult ); break;
                      case "poll_answer": this.RESULTCreateVote( this.m_oPageState.container, oResult ); break;
                      case "poll_answer_count": this.RESULTCreateVoteCount( this.m_oPageState.container, oResult ); break;
+                     case "poll_search": this.RESULTCreateSearch( this.m_oPageState.container, oResult ); break;
                      default: console.assert( false, `Result for ${sQueryName} has no stub` );
                   }
 
+                  if(typeof aQuery[ 2 ] !== "boolean") {                      // if boolean that means that query for state do not need any conditions
+                     let aCondition = <details.condition[]>aQuery[ 2 ];
+                     let i = 0;
+                     while(i < aCondition.length && aCondition[ i ].ready === true) i++;
 
-                  let aCondition = aQuery[2];
-                  let i = 0;
-                  while( i < aCondition.length && aCondition[i].ready === true ) i++;
-                  //if(i < aCondition.length) { aCondition[ i ].ready = true; i++; }
-
-                  // Check for more conditions?
-                  if(i < aCondition.length) {
-                     aQuery[1] = details.enumQueryState.send;
+                     // Check for more conditions?
+                     if(i < aCondition.length) {
+                        aQuery[ 1 ] = details.enumQueryState.send;
+                     }
                   }
 
                   this.WalkNextState(); // Go to next step in active state
@@ -423,6 +440,7 @@ export class CPageOne extends CPageSuper {
       let oCommand = { command: "add_condition_to_query get_result", delete: 1, query: "poll_overview", set: "vote", count: 50, format: 1, start: 0 };
       request.Get("SCRIPT_Run", { file: "PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
    }
+
 
    /**
     * Get links associated to poll
@@ -555,6 +573,21 @@ export class CPageOne extends CPageSuper {
          }
       });
       TDVote.ReadArray(oResult.table.body, { begin: 0 });
+      let iQuestion: number = <number>TDVote.CELLGetValue(0,0);
+
+      // add to our voter count chart data
+      for( let i = 0, iTo = TDVote.ROWGetCount(); i < iTo; i++ ) {
+         this.m_oD3Bar.AddAnswer( iQuestion, [
+            <number>TDVote.CELLGetValue(i,"PollAnswerK"),
+            <string>TDVote.CELLGetValue(i,"FName"),
+            0,0
+         ]);
+      }
+
+      this.m_oPageState.AddTableData( iQuestion, TDVote );
+
+      if( !eRoot ) return;                                 // no root item then skip
+
 
       let aColumn = TDVote.InsertColumn(2, 0, 1);
       CTableData.SetPropertyValue(aColumn, true, "id", "check");
@@ -567,8 +600,6 @@ export class CPageOne extends CPageSuper {
       TDVote.COLUMNUpdatePositionIndex();
 
 
-      let iQuestion: number = <number>TDVote.CELLGetValue(0,0);
-      this.m_oPageState.AddTableData( iQuestion, TDVote );
 
       // ## Find container element to question
       let eSection = <HTMLElement>eRoot.querySelector(`section[data-question="${iQuestion}"]`);
@@ -601,17 +632,6 @@ export class CPageOne extends CPageSuper {
 
       let TTVote = new CUITableText(<uitabledata_construct><unknown>options);
       TDVote.UIAppend(TTVote);
-
-      // add to our voter count chart data
-      for( let i = 0, iTo = TDVote.ROWGetCount(); i < iTo; i++ ) {
-         this.m_oD3Bar.AddAnswer( iQuestion, [
-            <number>TDVote.CELLGetValue(i,"PollAnswerK"),
-            <string>TDVote.CELLGetValue(i,"FName"),
-            0,0
-            //Math.floor(Math.random() * 100),0
-         ]);
-      }
-
 
       TTVote.COLUMNSetRenderer(0, (e, v, a) => {
          let eCheck = <HTMLElement>e.querySelector("div");
@@ -755,6 +775,14 @@ export class CPageOne extends CPageSuper {
     * @param {any} oResult server result with questions for selected poll
     */
    RESULTCreateQuestionPanel(eRoot: string|HTMLElement, oResult: any) {
+      let eQuestion;
+      let oTD = new CTableData({ id: oResult.id, name: oResult.name });
+      CPageSuper.ReadColumnInformationFromHeader(oTD, oResult.table.header);
+      oTD.ReadArray(oResult.table.body, { begin: 0 });
+
+      let eD3Bars = <HTMLElement>document.getElementById("idPollOverview").querySelector('[data-section="d3bars"]');
+      eD3Bars.innerHTML = "";
+
       if(typeof eRoot === "string") eRoot = document.getElementById(eRoot);
       
       // ## Create section where questions are placed. Questions are added to vote section on top
@@ -765,44 +793,38 @@ export class CPageOne extends CPageSuper {
       // <div>
       //    <button>Vote</button>
       // </div>
-      let eQuestion = <HTMLElement>eRoot.querySelector('[data-section="question"]'); // section where vote questions are placed
-      if(!eQuestion) {
-         eQuestion = <HTMLElement>document.createElement("div");
-         eQuestion.dataset.section = "question";
-         eRoot.appendChild( eQuestion );
-      }
+      if( eRoot ) {
+         let eQuestion = <HTMLElement>eRoot.querySelector('[data-section="question"]'); // section where vote questions are placed
+         if(!eQuestion) {
+            eQuestion = <HTMLElement>document.createElement("div");
+            eQuestion.dataset.section = "question";
+            eRoot.appendChild( eQuestion );
+         }
 
-      if(this.view_mode === "vote") {
-         // ## Create section for vote button
-         let eVote = <HTMLElement>eRoot.querySelector('[data-section="vote"]');
-         eVote = document.createElement("div");
-         eVote.dataset.section = "vote";
-         eRoot.appendChild(eVote);
+         if(this.view_mode === "vote") {
+            // ## Create section for vote button
+            let eVote = <HTMLElement>eRoot.querySelector('[data-section="vote"]');
+            eVote = document.createElement("div");
+            eVote.dataset.section = "vote";
+            eRoot.appendChild(eVote);
 
-         if(this.HISTORYFindPoll(this.GetActivePoll()) === false && this.poll.count < 1) {
-            if(eVote) {
-               eVote.innerHTML = `<button class='button is-white is-rounded is-primary is-large' style='width: 300px;'>RÖSTA</button>`;
+            if(this.HISTORYFindPoll(this.GetActivePoll()) === false && this.poll.count < 1) {
+               if(eVote) {
+                  eVote.innerHTML = `<button class='button is-white is-rounded is-primary is-large' style='width: 300px;'>RÖSTA</button>`;
+               }
+
+               let eButtonVote = <HTMLElement>eVote.querySelector("button");
+               eButtonVote.setAttribute("disabled", "");
+               eButtonVote.addEventListener("click", (e: Event) => {
+                  (<HTMLElement>e.srcElement).style.display = "none";
+                  this.SendVote();
+               });
             }
-
-            let eButtonVote = <HTMLElement>eVote.querySelector("button");
-            eButtonVote.setAttribute("disabled", "");
-            eButtonVote.addEventListener("click", (e: Event) => {
-               (<HTMLElement>e.srcElement).style.display = "none";
-               this.SendVote();
-            });
-         }
-         else {
-            eVote.innerText = "Röst är registrerad för aktuell fråga.";
+            else {
+               eVote.innerText = "Röst är registrerad för aktuell fråga.";
+            }
          }
       }
-
-
-      let oTD = new CTableData({ id: oResult.id, name: oResult.name });
-      CPageSuper.ReadColumnInformationFromHeader(oTD, oResult.table.header);
-      oTD.ReadArray(oResult.table.body, { begin: 0 });
-
-      let eD3Bars = <HTMLElement>document.getElementById("idPollOverview").querySelector('[data-section="d3bars"]');
-      eD3Bars.innerHTML = "";
 
 
       let aBody = oTD.GetData()[ 0 ];
@@ -810,23 +832,25 @@ export class CPageOne extends CPageSuper {
       aBody.forEach((aRow, i) => {
          // For each question in poll we add one condition to page state to return answers for that question where user are able to vote for one or more.
          const iQuestion = <number>aRow[ 0 ];
-         aCondition.push( { ready: false, table: "TPollQuestion1", id: "PollQuestionK", value: iQuestion} );
-         let eSection = <HTMLElement>document.createElement("section");
-         eSection.dataset.question = iQuestion.toString();
          const sName = aRow[ 1 ];
-         eSection.className = "block";
-         eSection.style.margin = "1em";
          const iPollIndex = i + 1; // Index for poll query
-         eSection.innerHTML = `<header class="title is-3">${iPollIndex}: ${sName}</header><article style="display: block;"></article>`;
-         eQuestion.appendChild(eSection);
+         aCondition.push( { ready: false, table: "TPollQuestion1", id: "PollQuestionK", value: iQuestion} );
+         if( eRoot ) {
+            let eQuestion = (<HTMLElement>eRoot).querySelector('[data-section="question"]'); // section where vote questions are placed
+            let eSection = <HTMLElement>document.createElement("section");
+            eSection.dataset.question = iQuestion.toString();
+            eSection.className = "block";
+            eSection.style.margin = "1em";
+            eSection.innerHTML = `<header class="title is-3">${iPollIndex}: ${sName}</header><article style="display: block;"></article>`;
+            eQuestion.appendChild(eSection);
+         }
 
-         eSection = <HTMLElement>document.createElement("section");
+         let eSection = <HTMLElement>document.createElement("section");
          eSection.className = "block box";
          eSection.style.padding = "0.5em";
          eSection.innerHTML = `<div class="is-size-6 has-text-weight-semibold" data-type="title"></div><div data-type="chart"></div>`;
          let eTitle = <HTMLElement>eSection.querySelector('[data-type="title"]');
          eTitle.innerText = <string>sName;
-
          let eChart = <HTMLElement>eSection.querySelector('[data-type="chart"]');
          this.m_oD3Bar.AddQuestion( iQuestion, <string>sName, eChart );     // Add question to d3 chart
 
@@ -922,6 +946,88 @@ export class CPageOne extends CPageSuper {
             }
          }
       });
+   }
+
+   /**
+    * Create search table used to select active poll
+    * @param {string|HTMLElement} eRoot   Container element for search table
+    * @param {any}                oResult result data for search
+    */
+   RESULTCreateSearch( eRoot: string|HTMLElement, oResult: any ) {
+      if(typeof eRoot === "string") eRoot = document.getElementById(eRoot);
+
+      let oTD = new CTableData({ id: oResult.id, name: oResult.name });
+
+      const aHeader = oResult.table.header;
+      CPageSuper.ReadColumnInformationFromHeader(oTD, aHeader, (iIndex, oColumn, oTD) => {
+         if(oColumn.key) {
+            oTD.COLUMNSetPropertyValue(iIndex, "position.hide", true);
+         }
+      });
+
+      oTD.ReadArray(oResult.table.body, { begin: 0 });
+      oTD.COLUMNSetType( oTD.ROWGet(1) );
+
+      oTD.COLUMNSetPropertyValue("FName", "alias", "Namn");
+      oTD.COLUMNSetPropertyValue("FDescription", "alias", "Beskrivning");
+      oTD.COLUMNSetPropertyValue("FBegin", "alias", "Start");
+      oTD.COLUMNSetPropertyValue("FEnd", "alias", "Slut");
+
+      oTD.COLUMNUpdatePositionIndex();
+
+      let eResult = eRoot
+      eResult.innerHTML = "";
+
+      let oStyle = {
+         html_group: "table.table is-narrow is-hoverable is-fullwidth", // "table" element and class table
+         html_row: "tr",                           // "tr" element for each row
+         html_cell_header: "th",                   // "th" for column headers
+         html_cell: "td",                          // "td" for cells
+         html_section_header: "thead",             // "thead" for header section
+         html_section_body: "tbody",               // "tbody" for body section
+      }
+
+      // trigger logic, this will enable triggering callbacks when CUITableText call methods in CTableData
+      let oTrigger = new CTableDataTrigger({ table: oTD, trigger: (oEventData, v) => {
+         if( oEventData.iEventAll === enumTrigger.AfterSelect ) {               // cell is selected
+            // try to get the poll id for row
+            const a = <[number,number,HTMLElement,number,number]>oEventData.information;
+            const iRowData = a[3]; // index 3 has index to row that is clicked
+
+            // Get poll id from table data for requested row
+            const oTD = oEventData.data; // get table data
+            const iPoll = <number>oTD.CELLGetValue( iRowData, "PollK" );// get key to poll
+
+            this.SetActiveState( "body.select" );
+            this.SetActivePoll( iPoll );                    // activate poll
+
+         }
+      }}); 
+
+      let options = {
+         edit: true,                               // enable events for slecting table cells
+         parent: eRoot,                            // container
+         section: [ "toolbar", "table.header", "table.body" ],// sections to create
+         table: oTD,                               // source data
+         style: oStyle,                            // styling
+         trigger: oTrigger,                        // set trigger object, this will enable triggers for the search table
+         callback_render: ( sType: string, e: EventDataTable, sSection: string, oColumn: any ) => {
+            if( sType === "beforeInput" ) {
+               let eTR = e.eElement.closest("tr");
+               let eTable = eTR.closest("table");
+
+               eTable.querySelectorAll("tr").forEach( e => e.classList.remove("selected") );
+
+               eTR.classList.add("selected");
+               return false;
+            }
+         }
+      };
+
+      let oTT = new CUITableText(options);
+      oTD.UIAppend(oTT);
+
+      oTT.Render();
    }
 
 

@@ -25,8 +25,10 @@ pageone = page logic for managing one vote, user can not select any votes. activ
 | RESULTCreateQuestionPanel | Create panels for each question that belongs to current selected poll. Like containers for selectable votes |
 | RESULTCreateVote | Create vote for poll question. Creates markup for possible answers to poll question |
 | RESULTCreateVoteCount | Create markup showing vote count on each answer for poll question |
+| RESULTCreateSearch | Create search table used to select active poll |
 | CONDITIONMarkFilterVote |  Mark items that has been filtered |
-| ELEMENTGetFilterButton |  Get button that adds or removes filter from poll result |
+| WalkNextState | Walks queries used to collect information for active state |
+
 
 |||
 
@@ -50,7 +52,9 @@ export class CPageOne extends CPageSuper {
         this.m_sViewMode = "vote"; // In what mode selected poll is. "vote" = enable voting for voter, "count" = view vote count for selected poll
         this.m_aPageState = [
             new CPageState({ section: "body", name: "vote", container: document.getElementById("idPollVote"), query: [["poll_question_list", 0 /* send */, []], ["poll_answer", 0 /* send */, []]] }),
-            new CPageState({ section: "body", name: "count", container: document.getElementById("idPollCount"), query: [["poll_question_list", 0 /* send */, []], ["poll_answer_count", 0 /* send */, []]] })
+            new CPageState({ section: "body", name: "count", container: document.getElementById("idPollCount"), query: [["poll_question_list", 0 /* send */, []], ["poll_answer_count", 0 /* send */, []]] }),
+            new CPageState({ section: "body", name: "search", container: document.getElementById("idPollSearch"), isolated: true, query: [["poll_search", 0 /* send */, false]] }),
+            new CPageState({ section: "body", name: "select", container: null, query: [["poll_question_list", 0 /* send */, []], ["poll_answer", 0 /* send */, []]] }),
         ];
         this.m_oElement = {
             "error": document.getElementById("idError"),
@@ -70,7 +74,7 @@ export class CPageOne extends CPageSuper {
     }
     get view_mode() { return this.m_sViewMode; }
     set view_mode(sMode) {
-        console.assert(sMode === "vote" || sMode === "count" || sMode === "search", "Invalid view mode: " + sMode);
+        console.assert(sMode === "vote" || sMode === "count" || sMode === "search" || sMode === "select", "Invalid view mode: " + sMode);
         this.m_sViewMode = sMode;
     }
     set voter(aVoter) { this.m_aVoter = aVoter; }
@@ -152,44 +156,59 @@ export class CPageOne extends CPageSuper {
         let aQuery = this.m_oPageState.GetOngoingQuery(); // returns first query where result hasn't been delivered
         if (aQuery === null) {
             this.m_oPageState.Reset(); // reset state (set queries to be sent and removes conditions)
-            this.m_oPageState = null;
-            this.QUERYGetPollFilterCount(this.GetActivePoll());
+            if (this.m_oPageState.IsIsolated() === false) {
+                this.m_oPageState = null;
+                this.QUERYGetPollFilterCount(this.GetActivePoll());
+            }
+            else {
+                this.m_oPageState = null;
+            }
             return;
         }
         if (aQuery[1] === 2 /* delivered */) {
             let aCondition = aQuery[2];
-            let i = 0;
-            while (i < aCondition.length && aCondition[i].ready === true)
-                ;
-            if (i < aCondition.length) {
-                aCondition[i].ready = true;
-                i++;
-            }
-            // Check for more conditions?
-            if (i < aCondition.length) {
-                aQuery[1] = 0 /* send */;
+            if (typeof aCondition !== "boolean") {
+                let i = 0;
+                while (i < aCondition.length && aCondition[i].ready === true)
+                    ;
+                if (i < aCondition.length) {
+                    aCondition[i].ready = true;
+                    i++;
+                }
+                // Check for more conditions?
+                if (i < aCondition.length) {
+                    aQuery[1] = 0 /* send */;
+                }
+                else {
+                    // get next non delivered query
+                    aQuery = this.m_oPageState.GetOngoingQuery();
+                }
             }
             else {
-                // get next non delivered query
                 aQuery = this.m_oPageState.GetOngoingQuery();
             }
         }
         if (aQuery && aQuery[1] === 0 /* send */) { // if query is in send state then send it
             // Get first filter that isn't sent
             let aCondition = aQuery[2];
-            let oQuery = new CQuery();
-            let a = [];
-            for (let i = 0; i < aCondition.length; i++) {
-                let oC = aCondition[i];
-                if (oC.ready === false) {
-                    oQuery.CONDITIONAdd(oC);
-                    oC.ready = true;
-                    break;
+            let sXml;
+            if (aCondition) {
+                let oQuery = new CQuery();
+                let a = [];
+                for (let i = 0; i < aCondition.length; i++) {
+                    let oC = aCondition[i];
+                    if (oC.ready === false) {
+                        oQuery.CONDITIONAdd(oC);
+                        oC.ready = true;
+                        break;
+                    }
                 }
+                sXml = oQuery.CONDITIONGetXml();
             }
-            let sXml = oQuery.CONDITIONGetXml();
             const sQuery = aQuery[0];
             let oCommand = { command: "add_condition_to_query get_result", delete: 1, query: sQuery, set: "vote", count: 50, format: 1, start: 0 };
+            if (!sXml)
+                delete oCommand.delete; // No condition then keep active conditions for query
             request.Get("SCRIPT_Run", { file: "PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
             aQuery[1] = 1 /* waiting */; // change state to waiting
         }
@@ -289,16 +308,20 @@ export class CPageOne extends CPageSuper {
                                 case "poll_answer_count":
                                     this.RESULTCreateVoteCount(this.m_oPageState.container, oResult);
                                     break;
+                                case "poll_search":
+                                    this.RESULTCreateSearch(this.m_oPageState.container, oResult);
+                                    break;
                                 default: console.assert(false, `Result for ${sQueryName} has no stub`);
                             }
-                            let aCondition = aQuery[2];
-                            let i = 0;
-                            while (i < aCondition.length && aCondition[i].ready === true)
-                                i++;
-                            //if(i < aCondition.length) { aCondition[ i ].ready = true; i++; }
-                            // Check for more conditions?
-                            if (i < aCondition.length) {
-                                aQuery[1] = 0 /* send */;
+                            if (typeof aQuery[2] !== "boolean") { // if boolean that means that query for state do not need any conditions
+                                let aCondition = aQuery[2];
+                                let i = 0;
+                                while (i < aCondition.length && aCondition[i].ready === true)
+                                    i++;
+                                // Check for more conditions?
+                                if (i < aCondition.length) {
+                                    aQuery[1] = 0 /* send */;
+                                }
                             }
                             this.WalkNextState(); // Go to next step in active state
                         }
@@ -465,6 +488,18 @@ export class CPageOne extends CPageSuper {
             }
         });
         TDVote.ReadArray(oResult.table.body, { begin: 0 });
+        let iQuestion = TDVote.CELLGetValue(0, 0);
+        // add to our voter count chart data
+        for (let i = 0, iTo = TDVote.ROWGetCount(); i < iTo; i++) {
+            this.m_oD3Bar.AddAnswer(iQuestion, [
+                TDVote.CELLGetValue(i, "PollAnswerK"),
+                TDVote.CELLGetValue(i, "FName"),
+                0, 0
+            ]);
+        }
+        this.m_oPageState.AddTableData(iQuestion, TDVote);
+        if (!eRoot)
+            return; // no root item then skip
         let aColumn = TDVote.InsertColumn(2, 0, 1);
         CTableData.SetPropertyValue(aColumn, true, "id", "check");
         CTableData.SetPropertyValue(aColumn, true, "alias", "Röst");
@@ -472,8 +507,6 @@ export class CPageOne extends CPageSuper {
         CTableData.SetPropertyValue(aColumn, true, "edit.edit", true);
         CTableData.SetPropertyValue(aColumn, true, "edit.element", 1);
         TDVote.COLUMNUpdatePositionIndex();
-        let iQuestion = TDVote.CELLGetValue(0, 0);
-        this.m_oPageState.AddTableData(iQuestion, TDVote);
         // ## Find container element to question
         let eSection = eRoot.querySelector(`section[data-question="${iQuestion}"]`);
         let eArticle = eSection.querySelector("article");
@@ -499,15 +532,6 @@ export class CPageOne extends CPageSuper {
         };
         let TTVote = new CUITableText(options);
         TDVote.UIAppend(TTVote);
-        // add to our voter count chart data
-        for (let i = 0, iTo = TDVote.ROWGetCount(); i < iTo; i++) {
-            this.m_oD3Bar.AddAnswer(iQuestion, [
-                TDVote.CELLGetValue(i, "PollAnswerK"),
-                TDVote.CELLGetValue(i, "FName"),
-                0, 0
-                //Math.floor(Math.random() * 100),0
-            ]);
-        }
         TTVote.COLUMNSetRenderer(0, (e, v, a) => {
             let eCheck = e.querySelector("div");
             let sChecked = "";
@@ -627,6 +651,12 @@ export class CPageOne extends CPageSuper {
      * @param {any} oResult server result with questions for selected poll
      */
     RESULTCreateQuestionPanel(eRoot, oResult) {
+        let eQuestion;
+        let oTD = new CTableData({ id: oResult.id, name: oResult.name });
+        CPageSuper.ReadColumnInformationFromHeader(oTD, oResult.table.header);
+        oTD.ReadArray(oResult.table.body, { begin: 0 });
+        let eD3Bars = document.getElementById("idPollOverview").querySelector('[data-section="d3bars"]');
+        eD3Bars.innerHTML = "";
         if (typeof eRoot === "string")
             eRoot = document.getElementById(eRoot);
         // ## Create section where questions are placed. Questions are added to vote section on top
@@ -637,53 +667,53 @@ export class CPageOne extends CPageSuper {
         // <div>
         //    <button>Vote</button>
         // </div>
-        let eQuestion = eRoot.querySelector('[data-section="question"]'); // section where vote questions are placed
-        if (!eQuestion) {
-            eQuestion = document.createElement("div");
-            eQuestion.dataset.section = "question";
-            eRoot.appendChild(eQuestion);
-        }
-        if (this.view_mode === "vote") {
-            // ## Create section for vote button
-            let eVote = eRoot.querySelector('[data-section="vote"]');
-            eVote = document.createElement("div");
-            eVote.dataset.section = "vote";
-            eRoot.appendChild(eVote);
-            if (this.HISTORYFindPoll(this.GetActivePoll()) === false && this.poll.count < 1) {
-                if (eVote) {
-                    eVote.innerHTML = `<button class='button is-white is-rounded is-primary is-large' style='width: 300px;'>RÖSTA</button>`;
+        if (eRoot) {
+            let eQuestion = eRoot.querySelector('[data-section="question"]'); // section where vote questions are placed
+            if (!eQuestion) {
+                eQuestion = document.createElement("div");
+                eQuestion.dataset.section = "question";
+                eRoot.appendChild(eQuestion);
+            }
+            if (this.view_mode === "vote") {
+                // ## Create section for vote button
+                let eVote = eRoot.querySelector('[data-section="vote"]');
+                eVote = document.createElement("div");
+                eVote.dataset.section = "vote";
+                eRoot.appendChild(eVote);
+                if (this.HISTORYFindPoll(this.GetActivePoll()) === false && this.poll.count < 1) {
+                    if (eVote) {
+                        eVote.innerHTML = `<button class='button is-white is-rounded is-primary is-large' style='width: 300px;'>RÖSTA</button>`;
+                    }
+                    let eButtonVote = eVote.querySelector("button");
+                    eButtonVote.setAttribute("disabled", "");
+                    eButtonVote.addEventListener("click", (e) => {
+                        e.srcElement.style.display = "none";
+                        this.SendVote();
+                    });
                 }
-                let eButtonVote = eVote.querySelector("button");
-                eButtonVote.setAttribute("disabled", "");
-                eButtonVote.addEventListener("click", (e) => {
-                    e.srcElement.style.display = "none";
-                    this.SendVote();
-                });
-            }
-            else {
-                eVote.innerText = "Röst är registrerad för aktuell fråga.";
+                else {
+                    eVote.innerText = "Röst är registrerad för aktuell fråga.";
+                }
             }
         }
-        let oTD = new CTableData({ id: oResult.id, name: oResult.name });
-        CPageSuper.ReadColumnInformationFromHeader(oTD, oResult.table.header);
-        oTD.ReadArray(oResult.table.body, { begin: 0 });
-        let eD3Bars = document.getElementById("idPollOverview").querySelector('[data-section="d3bars"]');
-        eD3Bars.innerHTML = "";
         let aBody = oTD.GetData()[0];
         let aCondition = [];
         aBody.forEach((aRow, i) => {
             // For each question in poll we add one condition to page state to return answers for that question where user are able to vote for one or more.
             const iQuestion = aRow[0];
-            aCondition.push({ ready: false, table: "TPollQuestion1", id: "PollQuestionK", value: iQuestion });
-            let eSection = document.createElement("section");
-            eSection.dataset.question = iQuestion.toString();
             const sName = aRow[1];
-            eSection.className = "block";
-            eSection.style.margin = "1em";
             const iPollIndex = i + 1; // Index for poll query
-            eSection.innerHTML = `<header class="title is-3">${iPollIndex}: ${sName}</header><article style="display: block;"></article>`;
-            eQuestion.appendChild(eSection);
-            eSection = document.createElement("section");
+            aCondition.push({ ready: false, table: "TPollQuestion1", id: "PollQuestionK", value: iQuestion });
+            if (eRoot) {
+                let eQuestion = eRoot.querySelector('[data-section="question"]'); // section where vote questions are placed
+                let eSection = document.createElement("section");
+                eSection.dataset.question = iQuestion.toString();
+                eSection.className = "block";
+                eSection.style.margin = "1em";
+                eSection.innerHTML = `<header class="title is-3">${iPollIndex}: ${sName}</header><article style="display: block;"></article>`;
+                eQuestion.appendChild(eSection);
+            }
+            let eSection = document.createElement("section");
             eSection.className = "block box";
             eSection.style.padding = "0.5em";
             eSection.innerHTML = `<div class="is-size-6 has-text-weight-semibold" data-type="title"></div><div data-type="chart"></div>`;
@@ -768,6 +798,72 @@ export class CPageOne extends CPageSuper {
                 }
             }
         });
+    }
+    /**
+     * Create search table used to select active poll
+     * @param {string|HTMLElement} eRoot   Container element for search table
+     * @param {any}                oResult result data for search
+     */
+    RESULTCreateSearch(eRoot, oResult) {
+        if (typeof eRoot === "string")
+            eRoot = document.getElementById(eRoot);
+        let oTD = new CTableData({ id: oResult.id, name: oResult.name });
+        const aHeader = oResult.table.header;
+        CPageSuper.ReadColumnInformationFromHeader(oTD, aHeader, (iIndex, oColumn, oTD) => {
+            if (oColumn.key) {
+                oTD.COLUMNSetPropertyValue(iIndex, "position.hide", true);
+            }
+        });
+        oTD.ReadArray(oResult.table.body, { begin: 0 });
+        oTD.COLUMNSetType(oTD.ROWGet(1));
+        oTD.COLUMNSetPropertyValue("FName", "alias", "Namn");
+        oTD.COLUMNSetPropertyValue("FDescription", "alias", "Beskrivning");
+        oTD.COLUMNSetPropertyValue("FBegin", "alias", "Start");
+        oTD.COLUMNSetPropertyValue("FEnd", "alias", "Slut");
+        oTD.COLUMNUpdatePositionIndex();
+        let eResult = eRoot;
+        eResult.innerHTML = "";
+        let oStyle = {
+            html_group: "table.table is-narrow is-hoverable is-fullwidth",
+            html_row: "tr",
+            html_cell_header: "th",
+            html_cell: "td",
+            html_section_header: "thead",
+            html_section_body: "tbody",
+        };
+        // trigger logic, this will enable triggering callbacks when CUITableText call methods in CTableData
+        let oTrigger = new CTableDataTrigger({ table: oTD, trigger: (oEventData, v) => {
+                if (oEventData.iEventAll === 131085 /* AfterSelect */) { // cell is selected
+                    // try to get the poll id for row
+                    const a = oEventData.information;
+                    const iRowData = a[3]; // index 3 has index to row that is clicked
+                    // Get poll id from table data for requested row
+                    const oTD = oEventData.data; // get table data
+                    const iPoll = oTD.CELLGetValue(iRowData, "PollK"); // get key to poll
+                    this.SetActiveState("body.select");
+                    this.SetActivePoll(iPoll); // activate poll
+                }
+            } });
+        let options = {
+            edit: true,
+            parent: eRoot,
+            section: ["toolbar", "table.header", "table.body"],
+            table: oTD,
+            style: oStyle,
+            trigger: oTrigger,
+            callback_render: (sType, e, sSection, oColumn) => {
+                if (sType === "beforeInput") {
+                    let eTR = e.eElement.closest("tr");
+                    let eTable = eTR.closest("table");
+                    eTable.querySelectorAll("tr").forEach(e => e.classList.remove("selected"));
+                    eTR.classList.add("selected");
+                    return false;
+                }
+            }
+        };
+        let oTT = new CUITableText(options);
+        oTD.UIAppend(oTT);
+        oTT.Render();
     }
     /**
      * Check if poll is found in history from local storage

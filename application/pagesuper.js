@@ -112,6 +112,7 @@ export class CPageState {
     constructor(options) {
         const o = options;
         this.m_bActive = false;
+        this.m_bIsolated = o.isolated || false;
         this.m_eContainer = o.container || null;
         this.m_sSection = o.section;
         this.m_sName = o.name;
@@ -123,6 +124,7 @@ export class CPageState {
     get name() { return this.m_sName; }
     get section() { return this.m_sSection; }
     IsActive() { return this.m_bActive; } // Is state active ? Only one active state for each page section
+    IsIsolated() { return this.m_bIsolated; } // Is page state self contained, do not update other page items when this state is active
     GetQueryName() {
         const aQuery = this.GetOngoingQuery();
         if (aQuery)
@@ -170,10 +172,10 @@ export class CPageState {
      */
     SetActive(aCondition) {
         this.m_aQuery.forEach((aQuery, i) => {
-            if (aCondition && i < aCondition.length) {
+            if (aCondition && i < aCondition.length && aQuery[2] !== false) {
                 aQuery[2] = aCondition[i];
             }
-            else
+            else if (aQuery[2] !== false)
                 aQuery[2] = null;
         });
         this.m_bActive = aCondition ? true : false;
@@ -182,6 +184,10 @@ export class CPageState {
     }
     Reset() {
         this.m_iQuery = 0; // set to first query
-        this.m_aQuery.forEach(a => { a[1] = 0 /* send */, a[2] = null; });
+        this.m_aQuery.forEach(a => {
+            a[1] = 0 /* send */;
+            if (typeof a[2] !== "boolean")
+                a[2] = null;
+        });
     }
 }

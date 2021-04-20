@@ -171,10 +171,15 @@ export class CD3Bar {
             const iWidth = this.getBBox().width;
             let iPosition = Math.max(d3XScale(a[2]), iWidth);
             if ((iPosition - iWidth) <= oMargin.left)
-                iPosition += oMargin.left;
+                iPosition = 25;
             return iPosition;
         })
-            .attr("text-anchor", "end")
+            .attr("text-anchor", function (a) {
+            const iWidth = this.getBBox().width + 10;
+            if (d3XScale(a[2]) < iWidth)
+                return "start";
+            return "end";
+        })
             .attr("font-family", "sans-serif")
             .attr("font-size", "12px")
             .attr("fill", function (a) {

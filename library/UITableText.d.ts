@@ -18,8 +18,8 @@ declare namespace details {
         callback_render?: ((sType: string, e: EventDataTable, sSection: string, oColumn?: tabledata_column) => boolean | void) | ((sType: string, e: EventDataTable, sSection: string, oColumn?: tabledata_column) => boolean | void)[];
         callback_renderer?: details.renderer[];
         create?: boolean;
-        edit?: boolean;
         dispatch?: CDispatch;
+        edit?: boolean;
         edits?: edit.CEdits;
         id?: string;
         offset_start?: number;

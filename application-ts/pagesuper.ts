@@ -17,8 +17,9 @@ namespace details {
 
    export type state_construct = {
       container: HTMLElement,// container element for result markup
+      isolated?: boolean;  // if state is runned alone, do not update page when state is ready
       name: string,        // name in page section
-      query: [string,number,condition[]][],
+      query: [string,number,(condition[] | boolean)][],// query for state, second item is condition or if false no condition is added to query
       section: string,     // page section
    }
 }
@@ -147,15 +148,17 @@ export class CPageSuper {
  */
 export class CPageState {
    m_bActive: boolean;  // If state is active
+   m_bIsolated: boolean; // If state is self contained, should not update rest of page when ready
    m_eContainer: HTMLElement;// container element
    m_sName: string;     // state name
    m_iQuery: number;    // Index to current query that is beeing processed
-   m_aQuery: [string,number,details.condition[]][];  // List of queries needed, what state they are in and how many times query is executed
+   m_aQuery: [string,number,details.condition[] | boolean][];  // List of queries needed, what state they are in and how many times query is executed
    m_aTableData: [number, CTableData][];
    m_sSection: string;  // what section in page
    constructor( options: details.state_construct ) {
       const o = options;
       this.m_bActive = false;
+      this.m_bIsolated = o.isolated || false;
       this.m_eContainer = o.container || null;
       this.m_sSection = o.section;
       this.m_sName = o.name;
@@ -171,6 +174,7 @@ export class CPageState {
    get section() { return this.m_sSection; }
 
    IsActive(): boolean { return this.m_bActive; }                              // Is state active ? Only one active state for each page section
+   IsIsolated(): boolean { return this.m_bIsolated; }                          // Is page state self contained, do not update other page items when this state is active
 
    GetQueryName(): string {                                                    // Return name for active query
       const aQuery = this.GetOngoingQuery();
@@ -181,7 +185,7 @@ export class CPageState {
    /**
     * Get first query that doesn't have the state delivered. If all queries has del
     */
-   GetOngoingQuery(): [ string, number, details.condition[] ] {
+   GetOngoingQuery(): [ string, number, details.condition[] | boolean] {
       for(let i = 0; i < this.m_aQuery.length; i++) {
          const aQuery = this.m_aQuery[i];
          if( aQuery[1] !== details.enumQueryState.delivered ) return aQuery;
@@ -216,12 +220,12 @@ export class CPageState {
     * When set to active add condition or conditions to query/queries. Conditions may be filled later from returned results
     * @param {[details.condition][]} [aCondition] condition set to queries that is executed. index will be matched for query index in query array for page state.
     */
-   SetActive(aCondition?: [details.condition][]): [string,number,details.condition[]][] {
+   SetActive(aCondition?: [details.condition][]): [string,number,details.condition[] | boolean][] {
       this.m_aQuery.forEach((aQuery, i) => {
-         if(aCondition && i < aCondition.length ) {
-            aQuery[2] = aCondition[i];
+         if(aCondition && i < aCondition.length && aQuery[2] !== false ) {
+            (<[string,number,details.condition[]]>aQuery)[2] = aCondition[i];
          }
-         else aQuery[2] = null;
+         else if( aQuery[2] !== false ) (<[string,number,details.condition[]]>aQuery)[2] = null;
       });
 
       this.m_bActive = aCondition ? true : false;
@@ -232,6 +236,9 @@ export class CPageState {
 
    Reset(): void {
       this.m_iQuery = 0; // set to first query
-      this.m_aQuery.forEach(a => { a[1] = details.enumQueryState.send, a[2] = null; });
+      this.m_aQuery.forEach(a => { 
+         a[1] = details.enumQueryState.send; 
+         if( typeof a[2] !== "boolean" ) a[2] = null; 
+      });
    }
 }
