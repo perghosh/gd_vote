@@ -824,7 +824,7 @@ export class CPageOne extends CPageSuper {
         let eResult = eRoot;
         eResult.innerHTML = "";
         let oStyle = {
-            html_group: "table.table is-narrow is-hoverable is-fullwidth",
+            html_group: "table.table is-narrow is-hoverable is-fullwidth pointer",
             html_row: "tr",
             html_cell_header: "th",
             html_cell: "td",
@@ -864,6 +864,13 @@ export class CPageOne extends CPageSuper {
         let oTT = new CUITableText(options);
         oTD.UIAppend(oTT);
         oTT.Render();
+        // Make header sticky
+        let eSection = oTT.GetSection("header");
+        let aTH = eSection.querySelectorAll("th");
+        aTH.forEach((e) => {
+            Object.assign(e.style, { backgroundColor: "var(--bs-white)", position: "sticky", top: "0px" });
+        });
+        oTT.GetSection("body").focus({ preventScroll: true });
     }
     /**
      * Check if poll is found in history from local storage

@@ -979,7 +979,7 @@ export class CPageOne extends CPageSuper {
       eResult.innerHTML = "";
 
       let oStyle = {
-         html_group: "table.table is-narrow is-hoverable is-fullwidth", // "table" element and class table
+         html_group: "table.table is-narrow is-hoverable is-fullwidth pointer", // "table" element and class table
          html_row: "tr",                           // "tr" element for each row
          html_cell_header: "th",                   // "th" for column headers
          html_cell: "td",                          // "td" for cells
@@ -1028,6 +1028,16 @@ export class CPageOne extends CPageSuper {
       oTD.UIAppend(oTT);
 
       oTT.Render();
+
+      // Make header sticky
+      let eSection = oTT.GetSection("header");
+      let aTH = eSection.querySelectorAll("th");
+      aTH.forEach((e) => {
+         Object.assign(e.style, { backgroundColor: "var(--bs-white)", position: "sticky", top: "0px" });
+      });
+
+      oTT.GetSection("body").focus({ preventScroll: true });
+      
    }
 
 
