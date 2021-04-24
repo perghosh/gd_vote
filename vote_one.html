@@ -63,24 +63,32 @@ div[data-section="container"]
                <p class="panel-heading" data-translate="page.vote.TitleLinks">Länkar</p>
             </article>               
 
-            <!-- Present poll result, after voter has voted or setting filter from vote count -->
-            <article class="panel has-background-white" data-section="result" style="display: none; margin-top: 1em; padding: 5px;">
-            </article>
 
             <!-- Present poll result as bar chart, one for each question-->
             <article class="panel" data-section="d3bars" style="width:  100%; margin-top: 1em; padding: 5px;">
             </article>
+
+<!-- <i class="fas fa-chevron-down"></i> -->
+            <div id="idResultVoteCount" class="box">
+               <div><a class="is-pulled-right is-size-6 has-text-weight-semibold" style="position: relative; top: -0.7em;">Lista med antal röster&nbsp;<i class="fas fa-chevron-down"></i></a></div>
+               <!-- Present poll result, after voter has voted or setting filter from vote count
+                    This section is hidden from user and to show it user need to click on the button above
+               -->
+               <article class="has-background-white" data-view="none" data-section="result_vote_count" style="display: none; margin-top: 1em; padding: 5px;">
+               </article>
+            </div>
          </div>
 
          <div id="idContent" data-section="content">
-            <!-- Vote section, here voter are able to vote -->
+            <!-- Vote section, here voter are able to vote, query = poll_question_list / poll_answer -->
             <article id="idPollVote" class="box is-active" data-index="1" data-state="body.vote">
             </article>
-            <!-- Vote count is where votes for each answer is shown -->
-            <article id="idPollCount" class="box" data-index="2" data-state="body.count">
+
+            <!-- Vote count is where votes for each answer is shown and buttons used to filter votes, query = poll_question_list / poll_answer_count -->
+            <article id="idPollFilterCount" class="box" data-index="2" data-state="body.count">
             </article>
 
-            <!-- Search for poll -->
+            <!-- Search for poll, this section presents search result, query = "poll_search"  -->
             <article id="idPollSearch" class="box" data-index="3" data-state="body.search">
             </article>
          </div>
@@ -90,7 +98,8 @@ div[data-section="container"]
 
    <script>
       function PAGE_Setup() {
-         window.app = new CApplication({ callback_action: PAGE_Callback });
+         const sSession = CPageOne.HISTORYSerializeSession( false );
+         window.app = new CApplication({ callback_action: PAGE_Callback, session: sSession });
          window.app.Initialize();
       }
 
@@ -100,9 +109,6 @@ div[data-section="container"]
        */
       function PAGE_Callback(sOperation) {
          if( sOperation === "load" ) {                      // queries are loaded for user, here you can sart
-            //this.QUERYGetLogin();
-            //this.QUERYGetPollList();
-
 
             const sQueryString = window.location.search;
             const oParams = new URLSearchParams(sQueryString);
@@ -131,11 +137,12 @@ div[data-section="container"]
          else if(sOperation === "server-session") {
             if( !this.page) {
                this.m_oPage = new CPageOne(this, {callback_action: PAGE_Callback, read_url: true});
+               const sSession = window.app.request.session;
+               CPageOne.HISTORYSerializeSession( true, sSession );
 
                //this.m_oPage.SetActivePoll( 26 );
             }
          }
-
       }
 
       /*
@@ -185,6 +192,24 @@ div[data-section="container"]
          if( e.srcElement.tagName === "BUTTON") {
             let eMessage = e.srcElement.closest("[data-message]");
             eMessage.style.display = "none"; 
+         }
+      });
+
+      let eVoteCountAnchor = document.getElementById("idResultVoteCount").querySelector("a");
+      eVoteCountAnchor.addEventListener("click", e => { 
+         let eContanier = e.target.closest(".box");
+
+         let eI = eContanier.querySelector("a").querySelector("i");
+         let eArticle = eContanier.querySelector("article");
+         if( eArticle.dataset.view === "none") {
+            eArticle.dataset.view = "block";
+            eArticle.style.display = "block";
+            eI.className = "fas fa-chevron-up";
+         }
+         else {
+            eArticle.dataset.view = "none";
+            eArticle.style.display = "none";
+            eI.className = "fas fa-chevron-down";
          }
       });
 
@@ -260,10 +285,13 @@ div[data-section="container"]
 <head>
    <meta charset="iso-8859-1">
    <title>Vote</title>
+   <!-- Bulma css -->
    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.1/css/bulma.min.css">
-   <!-- <script src="https://d3js.org/d3.v6.min.js"></script> -->
+   <!-- fontawesome -->
+   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" integrity="sha512-iBBXm8fW90+nuLcSKlbmrPcLa0OT92xO1BIsZ+ywDWZCvqsWgccV3gFoRBv0z+8dLJgyAHIhR35VZc2oM/gI1w==" crossorigin="anonymous" />
+
+   <!-- d3 -->
    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/6.7.0/d3.js"></script>
-   
    <style>
       :root {
          --gd-blue: #0d6efd;

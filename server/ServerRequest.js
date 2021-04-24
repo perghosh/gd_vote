@@ -160,9 +160,17 @@ export class CRequest {
             let aSection = oXml.getElementsByTagName('section'); // get all sections
             for (let i = 0; i < aSection.length; i++) { // iterate sections
                 let eSection = aSection[i];
+                let sError = eSection.getAttribute("error"); // found error ?
                 let sMethod = eSection.getAttribute("name"); // method name for section
                 if (sMethod === "s03") {
-                    this.session = eSection.querySelector("user").getAttribute("user");
+                    if (sError === "1" && !this.session) {
+                        this.session = null;
+                        this.m_callProcess[0].call(this, null, "user");
+                        return;
+                    }
+                    else {
+                        this.session = eSection.querySelector("user").getAttribute("user");
+                    }
                 }
                 oEvent.sMethod = sMethod; // server method name
                 sMethod = this.GetMethodName(sMethod); // get client method name

@@ -7,6 +7,7 @@ namespace details {
    export type application_construct = {
       callback_action?: ((sMessage: string) => void);
       state?: { [key_name: string]: string|number|boolean } // state items for page
+      session?: string;
    }
 }
 
@@ -28,14 +29,17 @@ export class CApplication {
          callback: CApplication.CallbackServer,
          folder: "rSelect",
          methods: { SYSTEM_Init: "l10", SYSTEM_GetUserData: "s03", SYSTEM_GetCountry: "s08", SCRIPT_Run: "f60", REPORT_Pdf: "r02" },
-         url: "http://127.0.0.1:8882/jq.srf?"
+         //url: "http://127.0.0.1:8882/jq.srf?"
          //url: "http://goorep.se:1001/changelog/jq.srf?"
-         //url: "http://localhost:8080/so/jq.srf?"
+         url: "http://localhost:8080/so/jq.srf?"
       });
 
       this.m_sAlias = "guest";                                                  // change this based on what alias that is used
       //this.m_sAlias = "per";
       this.m_sQueriesSet = "vote";
+      if(o.session) {
+         this.m_oRequest.session = o.session;
+      }
    }
 
    get alias() { return this.m_sAlias; }
@@ -59,6 +63,13 @@ export class CApplication {
 
       this.m_oRequest.Get("SYSTEM_Init|SYSTEM_GetCountry|SYSTEM_GetUserData", { name: this.alias, flags: "ip" });
    }
+
+   /**
+    * Get user session
+    */
+   GetSession() {
+      this.m_oRequest.Get("SYSTEM_GetUserData", { name: this.alias, flags: "ip" });
+   }   
 
    /**
     * Initialize page information, user is verified and it is tome to collect information needed to render page markup

@@ -53,8 +53,9 @@ namespace details {
    export type condition = { ready?: boolean, table: string, id: string, value: string|number, simple?: string, operator?: number }
 
    export type page_construct = {
-      callback_action?: ((sMessage: string) => void);
-      state?: { [key_name: string]: string|number|boolean } // state items for page
+      callback_action?: ((sMessage: string) => void),
+      state?: { [key_name: string]: string|number|boolean }, // state items for page
+      session?: string,
    }
 }
 
@@ -73,6 +74,7 @@ export class CPageOne extends CPageSuper {
    m_oPoll: { poll: number, vote: number, count: number };
    m_oState: { [ key_name: string ]: string | number | boolean }; // States for page, may be used for outside actions
    m_sSearchMode: string;           // Search mode (this is top section in page), valid types are "hash", "field", "area", "personal"
+   m_sSession: string;              // save session to manage reload from user, try to get older version of session avoiding to many users
    m_oTDVoter: CTableData;          // User data for voter
    m_sViewMode: string;             // view mode page is in
    m_aVoter: [ number, string, string ];// key, alias and name for current voter
@@ -87,12 +89,13 @@ export class CPageOne extends CPageSuper {
       this.m_bFilterConditionCount = false;
 
       this.m_oPoll = { poll: -1, vote: -1, count: 0 };
+      this.m_sSession = o.session || null;
       this.m_oState = o.state || {};
       this.m_sViewMode = "vote";          // In what mode selected poll is. "vote" = enable voting for voter, "count" = view vote count for selected poll
 
       this.m_aPageState = [
          new CPageState({ section: "body", name: "vote", container: document.getElementById("idPollVote"), query: [ [ "poll_question_list", details.enumQueryState.send, [] ], [ "poll_answer", details.enumQueryState.send, [] ] ] }),
-         new CPageState({ section: "body", name: "count", container: document.getElementById("idPollCount"), query: [ [ "poll_question_list", details.enumQueryState.send, [] ], [ "poll_answer_count", details.enumQueryState.send, [] ] ] }),
+         new CPageState({ section: "body", name: "count", container: document.getElementById("idPollFilterCount"), query: [ [ "poll_question_list", details.enumQueryState.send, [] ], [ "poll_answer_count", details.enumQueryState.send, [] ] ] }),
          new CPageState({ section: "body", name: "search", container: document.getElementById("idPollSearch"), isolated: true, query: [ [ "poll_search", details.enumQueryState.send, false ] ] }),
          new CPageState({ section: "body", name: "select", container: null, query: [ [ "poll_question_list", details.enumQueryState.send, [] ], [ "poll_answer", details.enumQueryState.send, [] ] ] }),
       ];
@@ -137,7 +140,7 @@ export class CPageOne extends CPageSuper {
       if( this.m_oD3Bar ) this.m_oD3Bar.DeleteQuestion();
 
       if( iActivePoll !== this.GetActivePoll() ) {
-         (<HTMLElement>document.getElementById( "idPollOverview" ).querySelector('[data-section="result"]')).style.display = "none";
+         (<HTMLElement>document.getElementById( "idPollOverview" ).querySelector('[data-section="result_vote_count"]')).style.display = "none";
       }
 
       if( typeof iActivePoll === "number" ) {
@@ -264,7 +267,7 @@ export class CPageOne extends CPageSuper {
          const sQuery = aQuery[0];
          let oCommand = { command: "add_condition_to_query get_result", delete: 1, query: sQuery, set: "vote", count: 50, format: 1, start: 0 };
          if( !sXml ) delete oCommand.delete;               // No condition then keep active conditions for query
-         request.Get("SCRIPT_Run", { file: "PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
+         request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
          aQuery[ 1 ] = details.enumQueryState.waiting;                        // change state to waiting
       }
       else {
@@ -277,7 +280,7 @@ export class CPageOne extends CPageSuper {
 
    CloseQuestions() {
       document.getElementById("idPollVote").innerHTML = "";
-      document.getElementById("idPollCount").innerHTML = "";
+      document.getElementById("idPollFilterCount").innerHTML = "";
       this.OpenMessage();                                   // close any open message
    }
 
@@ -348,6 +351,10 @@ export class CPageOne extends CPageSuper {
 
 
    ProcessResponse(eItem: Element, sName: string, sHint: string ) {
+      if( eItem === null ) {
+         if( sName === "user" ) this.app.GetSession();
+         return;
+      }
       let oResult = JSON.parse(eItem.textContent);
       switch(sName) {
          case "delete_condition":
@@ -438,7 +445,7 @@ export class CPageOne extends CPageSuper {
       let sXml = <string>oQuery.CONDITIONGetXml();
 
       let oCommand = { command: "add_condition_to_query get_result", delete: 1, query: "poll_overview", set: "vote", count: 50, format: 1, start: 0 };
-      request.Get("SCRIPT_Run", { file: "PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
+      request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
    }
 
 
@@ -454,7 +461,7 @@ export class CPageOne extends CPageSuper {
       let sXml = <string>oQuery.CONDITIONGetXml();
 
       let oCommand = { command: "add_condition_to_query get_result", delete: 1, query: "poll_links", set: "vote", count: 50, format: 1, start: 0 };
-      request.Get("SCRIPT_Run", { file: "PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
+      request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
    }
 
 
@@ -490,7 +497,7 @@ export class CPageOne extends CPageSuper {
       let sXml = <string>oQuery.CONDITIONGetXml();
 
       this.m_bFilterConditionCount = false;
-      request.Get("SCRIPT_Run", { file: "PAGE_result.lua", hint: sQuery, json: request.GetJson(oCommand) }, sXml);
+      request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", hint: sQuery, json: request.GetJson(oCommand) }, sXml);
    }
 
 
@@ -547,6 +554,7 @@ export class CPageOne extends CPageSuper {
          if(eCount) eCount.textContent = iQuestionCount.toString();
       }
 
+      // show or hide links
       let eLink = <HTMLElement>eRoot.querySelector('[data-section="link"]');
       if( iLinkCount > 0 ) {
          eLink.style.display = "block";
@@ -728,7 +736,7 @@ export class CPageOne extends CPageSuper {
       }
 
 
-      let eResult = <HTMLElement>eRoot.querySelector('[data-section="result"]');
+      let eResult = <HTMLElement>eRoot.querySelector('[data-section="result_vote_count"]');
       eResult.innerHTML = "";
 
       let oStyle = {
@@ -766,7 +774,7 @@ export class CPageOne extends CPageSuper {
 
       oTT.Render();
       this.m_oD3Bar.Render( this.m_bFilterConditionCount );
-      eResult.style.display = "block";                     // show result
+      //eResult.style.display = "block";                     // show result
    }
 
    /**
@@ -806,6 +814,7 @@ export class CPageOne extends CPageSuper {
             let eVote = <HTMLElement>eRoot.querySelector('[data-section="vote"]');
             eVote = document.createElement("div");
             eVote.dataset.section = "vote";
+            eVote.className = "has-text-info is-size-4";
             eRoot.appendChild(eVote);
 
             if(this.HISTORYFindPoll(this.GetActivePoll()) === false && this.poll.count < 1) {
@@ -1005,7 +1014,7 @@ export class CPageOne extends CPageSuper {
       }}); 
 
       let options = {
-         edit: true,                               // enable events for slecting table cells
+         edit: true,                               // enable events for selecting table cells
          parent: eRoot,                            // container
          section: [ "toolbar", "table.header", "table.body" ],// sections to create
          table: oTD,                               // source data
@@ -1064,6 +1073,25 @@ export class CPageOne extends CPageSuper {
       }
    }
 
+   static HISTORYSerializeSession( bSave: boolean, sSession: string ): string |null {
+      if( bSave === true ) {
+         const oSession = { time: (new Date()).toISOString(), session: sSession };
+         localStorage.setItem( "session", JSON.stringify( oSession ) );
+      }
+      else {
+         const sSession = localStorage.getItem("session");
+         if( sSession ) {
+            const oSession: { time: string, session: string } = JSON.parse( sSession );
+            // Compare date, if older than one hour then skip
+            const iDifference: any = <any>(new Date()) - Date.parse(oSession.time);
+            if( iDifference <  3600000 ) {
+               return oSession.session;
+            }
+         }
+      }
+      return null;
+   }
+
    /**
     * Mark condition, user need to know what is filtered on
     * @param {any} oResult condition items for query
@@ -1097,7 +1125,7 @@ export class CPageOne extends CPageSuper {
       let oCommand: {[key:string]: string|number} = { command: "delete_condition_from_query get_result get_query_conditions", query: sQuery, set: "vote", count: 100, format: 1, start: 0 };
 
       if( _Uuid === undefined ) {  // no uuid, then delete all
-         request.Get("SCRIPT_Run", { file: "PAGE_result.lua", hint: sQuery, json: request.GetJson(oCommand) }, sXml);
+         request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", hint: sQuery, json: request.GetJson(oCommand) }, sXml);
          return;
       }
 
@@ -1105,7 +1133,7 @@ export class CPageOne extends CPageSuper {
          oCommand.uuid = _Uuid
       }
       
-      request.Get("SCRIPT_Run", { file: "PAGE_result.lua", hint: sQuery, json: request.GetJson(oCommand) }, sXml);
+      request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", hint: sQuery, json: request.GetJson(oCommand) }, sXml);
    }
 
 
@@ -1114,7 +1142,7 @@ export class CPageOne extends CPageSuper {
     * @param iAnswer key to active answer
     */
    ELEMENTGetFilterButton( iAnswer: number ): HTMLButtonElement {
-      const eArticle = document.getElementById("idPollCount");
+      const eArticle = document.getElementById("idPollFilterCount");
       const eButton = eArticle.querySelector(`button[data-answer="${iAnswer}"]`);
       return <HTMLButtonElement>eButton;
    }
