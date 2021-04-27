@@ -11,7 +11,7 @@ namespace details {
    export type condition = { ready?: boolean, table: string, id: string, value: string|number, simple?: string, operator?: number }
 
    export type page_construct = {
-      callback_action?: ((sMessage: string) => void);
+      callback_action?: ((sMessage: string, data?: any) => void);
       state?: { [key_name: string]: string|number|boolean } // state items for page
    }
 
@@ -26,7 +26,7 @@ namespace details {
 
 
 export class CPageSuper {
-   m_callAction: ((sMessage: string) => void);// callback array for action hooks
+   m_callAction: ((sMessage: string, data?: any) => void);// callback array for action hooks
    m_oApplication: CApplication;
    m_oElement: { [key_name: string]: HTMLElement };
 
@@ -46,8 +46,8 @@ export class CPageSuper {
     * Call owner to page, owner is probably a callback in the html page this page object is used for
     * @param sMessage
     */
-   CallOwner( sMessage ) {
-      if( this.m_callAction ) this.m_callAction.call( this, sMessage );
+   CallOwner( sMessage: string, data?: any ) {
+      if( this.m_callAction ) this.m_callAction.call( this, sMessage, data );
    }
 
 

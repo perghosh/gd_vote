@@ -28,7 +28,7 @@ pageone = page logic for managing one vote, user can not select any votes. activ
 | RESULTCreateSearch | Create search table used to select active poll |
 | CONDITIONMarkFilterVote |  Mark items that has been filtered |
 | WalkNextState | Walks queries used to collect information for active state |
-
+| SNAPSHOTCreateSearch | Walks queries used to collect information for active state |
 
 |||
 
@@ -50,6 +50,7 @@ export class CPageOne extends CPageSuper {
         this.m_oPoll = { poll: -1, vote: -1, count: 0 };
         this.m_sSession = o.session || null;
         this.m_oState = o.state || {};
+        this.m_oUITableText = {};
         this.m_sViewMode = "vote"; // In what mode selected poll is. "vote" = enable voting for voter, "count" = view vote count for selected poll
         this.m_aPageState = [
             new CPageState({ section: "body", name: "vote", container: document.getElementById("idPollVote"), query: [["poll_question_list", 0 /* send */, []], ["poll_answer", 0 /* send */, []]] }),
@@ -208,6 +209,8 @@ export class CPageOne extends CPageSuper {
             }
             const sQuery = aQuery[0];
             let oCommand = { command: "add_condition_to_query get_result", delete: 1, query: sQuery, set: "vote", count: 50, format: 1, start: 0 };
+            if (sQuery === "poll_search")
+                oCommand.count = 10;
             if (!sXml)
                 delete oCommand.delete; // No condition then keep active conditions for query
             request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
@@ -330,6 +333,7 @@ export class CPageOne extends CPageSuper {
                                 }
                             }
                             this.WalkNextState(); // Go to next step in active state
+                            return;
                         }
                     }
                     if (sQueryName === "poll_overview") {
@@ -340,6 +344,9 @@ export class CPageOne extends CPageSuper {
                     }
                     else if (sQueryName === "poll_answer_filtercount") {
                         this.RESULTCreatePollFilterCount("idPollOverview", oResult);
+                    }
+                    else if (sQueryName === "poll_search") {
+                        this.RESULTCreateSearch("idPollSearch", oResult);
                     }
                 }
                 break;
@@ -369,6 +376,14 @@ export class CPageOne extends CPageSuper {
                     }
                 }
                 break;
+            default: {
+                let iPosition = sName.indexOf("get_query_information-");
+                if (iPosition === 0) {
+                    if (oResult.name === "poll_search") {
+                        this.SNAPSHOTCreateSearch(oResult);
+                    }
+                }
+            }
         }
     }
     /**
@@ -421,6 +436,18 @@ export class CPageOne extends CPageSuper {
         let sXml = oQuery.CONDITIONGetXml();
         this.m_bFilterConditionCount = false;
         request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", hint: sQuery, json: request.GetJson(oCommand) }, sXml);
+    }
+    QUERYGetSearch(oCondition) {
+        let request = this.app.request;
+        let sCommand = "";
+        let oCommand = { query: "poll_search", set: "vote", count: 100, format: 1, start: 0 };
+        if (oCondition.snapshot) {
+            oCommand.name = oCondition.snapshot;
+            sCommand += " set_snapshot";
+        }
+        sCommand += " get_result";
+        oCommand.command = sCommand;
+        request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", hint: "poll_search", json: request.GetJson(oCommand) });
     }
     /**
      * result for selected poll
@@ -815,7 +842,15 @@ export class CPageOne extends CPageSuper {
     RESULTCreateSearch(eRoot, oResult) {
         if (typeof eRoot === "string")
             eRoot = document.getElementById(eRoot);
-        let oTD = new CTableData({ id: oResult.id, name: oResult.name });
+        let oTT = this.m_oUITableText.poll_search;
+        let oTD = oTT ? oTT.data : null;
+        if (oTD) {
+            oTD.ClearData("body");
+            oTD.ReadArray(oResult.table.body, { begin: 0 });
+            oTT.Render(); // render with small caps creates elements for body and renders values
+            return;
+        }
+        oTD = new CTableData({ id: oResult.id, name: oResult.name });
         const aHeader = oResult.table.header;
         CPageSuper.ReadColumnInformationFromHeader(oTD, aHeader, (iIndex, oColumn, oTD) => {
             if (oColumn.key) {
@@ -823,7 +858,8 @@ export class CPageOne extends CPageSuper {
             }
         });
         oTD.ReadArray(oResult.table.body, { begin: 0 });
-        oTD.COLUMNSetType(oTD.ROWGet(1));
+        if (oTD.ROWGetCount() > 0)
+            oTD.COLUMNSetType(oTD.ROWGet(1));
         oTD.COLUMNSetPropertyValue("FName", "alias", "Namn");
         oTD.COLUMNSetPropertyValue("FDescription", "alias", "Beskrivning");
         oTD.COLUMNSetPropertyValue("FBegin", "alias", "Start");
@@ -869,7 +905,7 @@ export class CPageOne extends CPageSuper {
                 }
             }
         };
-        let oTT = new CUITableText(options);
+        oTT = new CUITableText(options);
         oTD.UIAppend(oTT);
         oTT.Render();
         // Make header sticky
@@ -879,6 +915,10 @@ export class CPageOne extends CPageSuper {
             Object.assign(e.style, { backgroundColor: "var(--bs-white)", position: "sticky", top: "0px" });
         });
         oTT.GetSection("body").focus({ preventScroll: true });
+        this.m_oUITableText.poll_search = oTT;
+        eRoot.dataset.one = "1"; // You do not need to fill this again
+        this.SNAPSHOTGetFor("poll_search");
+        this.CallOwner("table", { name: "poll_search", tt: oTT, td: oTD });
     }
     /**
      * Check if poll is found in history from local storage
@@ -957,6 +997,45 @@ export class CPageOne extends CPageSuper {
             oCommand.uuid = _Uuid;
         }
         request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", hint: sQuery, json: request.GetJson(oCommand) }, sXml);
+    }
+    SNAPSHOTGetFor(sQuery) {
+        let request = this.app.request;
+        let oCommand = { command: "get_query_information", query: sQuery, set: "vote" };
+        request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", json: request.GetJson(oCommand) });
+    }
+    /**
+     * Create dropdown for setting snapshots for selecting poll
+     * @param {any} oResult query data that contains snapshot information
+     */
+    SNAPSHOTCreateSearch(oResult) {
+        let oTT = this.m_oUITableText.poll_search;
+        let eToolbar = oTT.GetSection("toolbar");
+        if (oResult.snapshots) {
+            let eSelect = document.createElement("select");
+            oResult.snapshots.forEach((s, i) => {
+                let eOption = document.createElement("option");
+                eOption.value = s;
+                let sText = s;
+                const sTitle = sText;
+                eOption.innerText = sText;
+                if (s === oResult.selected)
+                    eOption.setAttribute("selected", "selected");
+                eSelect.appendChild(eOption);
+            });
+            /*
+            for( let i = 0; i < result.snapshots.length; i++ ) {
+               if( result.snapshots[i] === result.selected ) { result.snapshots[i] = { name: result.snapshots[i], selected: 1 }; break; }
+            }
+            */
+            let eDiv = document.createElement("div");
+            eDiv.className = "select is-primary";
+            eDiv.appendChild(eSelect);
+            eToolbar.appendChild(eDiv);
+            eSelect.addEventListener("change", e => {
+                const sSnapshot = e.srcElement.value;
+                this.QUERYGetSearch({ snapshot: sSnapshot });
+            });
+        }
     }
     /**
      * Return element for filter button

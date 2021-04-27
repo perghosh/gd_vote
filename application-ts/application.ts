@@ -1,11 +1,11 @@
 import { CUITableText } from "./../library/UITableText.js";
 import { edit  } from "./../library/TableDataEdit.js";
 import { CRequest, EventRequest } from "./../server/ServerRequest.js";
-import { CPage } from "./page.js";
+import { CPageOne } from "./pageone.js";
 
 namespace details {
    export type application_construct = {
-      callback_action?: ((sMessage: string) => void);
+      callback_action?: ((sMessage: string, data: any) => void);
       state?: { [key_name: string]: string|number|boolean } // state items for page
       session?: string;
    }
@@ -13,9 +13,9 @@ namespace details {
 
 
 export class CApplication {
-   m_callAction: ((sMessage: string) => void);// callback array for action hooks
+   m_callAction: ((sMessage: string, data: any) => void);// callback array for action hooks
    m_sAlias: string;
-   m_oPage: CPage;
+   m_oPage: CPageOne;
    m_sQueriesSet: string;
    m_oEditors: edit.CEditors;
    m_oRequest: CRequest;
@@ -29,9 +29,9 @@ export class CApplication {
          callback: CApplication.CallbackServer,
          folder: "rSelect",
          methods: { SYSTEM_Init: "l10", SYSTEM_GetUserData: "s03", SYSTEM_GetCountry: "s08", SCRIPT_Run: "f60", REPORT_Pdf: "r02" },
-         //url: "http://127.0.0.1:8882/jq.srf?"
+         url: "http://127.0.0.1:8882/jq.srf?"
          //url: "http://goorep.se:1001/changelog/jq.srf?"
-         url: "http://localhost:8080/so/jq.srf?"
+         //url: "http://localhost:8080/so/jq.srf?"
       });
 
       this.m_sAlias = "guest";                                                  // change this based on what alias that is used
@@ -46,7 +46,7 @@ export class CApplication {
    get request() { return this.m_oRequest; }
    get session() { return this.m_oRequest.session; }
    get page() { return this.m_oPage; }
-   set page( oPage: CPage ) { this.m_oPage = oPage; }
+   set page( oPage: CPageOne ) { this.m_oPage = oPage; }
    get queries_set() { return this.m_sQueriesSet; }
    set queries_set(s) { this.m_sQueriesSet = s; }
 
@@ -75,11 +75,11 @@ export class CApplication {
     * Initialize page information, user is verified and it is tome to collect information needed to render page markup
     */
    InitializePage( oState?: { [key_name: string]: string|number|boolean } ) {
-      this.m_oPage = new CPage(this);
+      this.m_oPage = new CPageOne(this, {callback_action: this.m_callAction});
    }
 
-   CallOwner( sMessage ) {
-      if( this.m_callAction ) this.m_callAction.call( this, sMessage );
+   CallOwner( sMessage: string, data?: any ) {
+      if( this.m_callAction ) this.m_callAction.call( this, sMessage, data );
    }
 
    OnResponse(eSection, sMethod: string , sHint: string ) {

@@ -10,9 +10,9 @@ export class CPageSuper {
      * Call owner to page, owner is probably a callback in the html page this page object is used for
      * @param sMessage
      */
-    CallOwner(sMessage) {
+    CallOwner(sMessage, data) {
         if (this.m_callAction)
-            this.m_callAction.call(this, sMessage);
+            this.m_callAction.call(this, sMessage, data);
     }
     /**
      * Open message in message section. if no parameters then message is removed

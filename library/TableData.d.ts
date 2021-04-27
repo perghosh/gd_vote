@@ -299,8 +299,9 @@ export declare class CTableData {
     ValidateCoords(iR: number, _C: number | string): boolean;
     /**
      * Clear internal data, everything that is data related that is.
+     * @param {"column" | "body"} [sType] Type of data to be cleared
      */
-    ClearData(): void;
+    ClearData(sType?: "column" | "body"): void;
     /**
      * Append user interface object that is using data from table data
      * @param oUI object that is added, it has to have getters for "id" and "name" values, these are used to get UI from table data

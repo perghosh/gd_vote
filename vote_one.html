@@ -89,7 +89,7 @@ div[data-section="container"]
             </article>
 
             <!-- Search for poll, this section presents search result, query = "poll_search"  -->
-            <article id="idPollSearch" class="box" data-index="3" data-state="body.search">
+            <article id="idPollSearch" class="box" data-index="3" data-state="body.search" data-one="0">
             </article>
          </div>
       </div>
@@ -107,7 +107,7 @@ div[data-section="container"]
        * Callback used by CPage class. CPage has the main page logic. Some logic is found here
        * @param sMessage type of operation
        */
-      function PAGE_Callback(sOperation) {
+      function PAGE_Callback(sOperation, data) {
          if( sOperation === "load" ) {                      // queries are loaded for user, here you can sart
 
             const sQueryString = window.location.search;
@@ -141,6 +141,14 @@ div[data-section="container"]
                CPageOne.HISTORYSerializeSession( true, sSession );
 
                //this.m_oPage.SetActivePoll( 26 );
+            }
+         }
+         else if(sOperation === "table") {
+            if( data.name === "poll_search" ) {
+               let e = data.tt.GetSection("body");
+               e.classList.add("is-size-6");
+               e = data.tt.GetSection("toolbar");
+               e.style.marginBottom = "10px";
             }
          }
       }
@@ -179,7 +187,14 @@ div[data-section="container"]
             // ## Process page operation based on what tab that is selected
             if(eContainer.dataset.pageType === "vote") {
                const oPage = window.app.page;
-               oPage.SetActiveState(eContent.dataset.state, eContent);        // Set the page state for vote section (results or voting)
+
+               //
+               // ## Set current state for vote page
+               // ## Here we open voting, filter or select poll
+               //
+
+               if( eContent.dataset.one === "1") return;                        // Do we need to get result for this again, if 1 then information is set
+               oPage.SetActiveState(eContent.dataset.state, eContent);          // Set the page state for vote section (results or voting)
                if(oPage.GetActivePoll() > 0) oPage.SetActivePoll(oPage.GetActivePoll());
             }
          });

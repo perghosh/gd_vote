@@ -1,6 +1,6 @@
 import { edit } from "./../library/TableDataEdit.js";
 import { CRequest } from "./../server/ServerRequest.js";
-import { CPage } from "./page.js";
+import { CPageOne } from "./pageone.js";
 export class CApplication {
     constructor(oOptions) {
         const o = oOptions || {};
@@ -11,9 +11,9 @@ export class CApplication {
             callback: CApplication.CallbackServer,
             folder: "rSelect",
             methods: { SYSTEM_Init: "l10", SYSTEM_GetUserData: "s03", SYSTEM_GetCountry: "s08", SCRIPT_Run: "f60", REPORT_Pdf: "r02" },
-            //url: "http://127.0.0.1:8882/jq.srf?"
+            url: "http://127.0.0.1:8882/jq.srf?"
             //url: "http://goorep.se:1001/changelog/jq.srf?"
-            url: "http://localhost:8080/so/jq.srf?"
+            //url: "http://localhost:8080/so/jq.srf?"
         });
         this.m_sAlias = "guest"; // change this based on what alias that is used
         //this.m_sAlias = "per";
@@ -51,11 +51,11 @@ export class CApplication {
      * Initialize page information, user is verified and it is tome to collect information needed to render page markup
      */
     InitializePage(oState) {
-        this.m_oPage = new CPage(this);
+        this.m_oPage = new CPageOne(this, { callback_action: this.m_callAction });
     }
-    CallOwner(sMessage) {
+    CallOwner(sMessage, data) {
         if (this.m_callAction)
-            this.m_callAction.call(this, sMessage);
+            this.m_callAction.call(this, sMessage, data);
     }
     OnResponse(eSection, sMethod, sHint) {
         let aItem = eSection.getElementsByTagName('item');

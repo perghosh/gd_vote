@@ -28,7 +28,7 @@ pageone = page logic for managing one vote, user can not select any votes. activ
 | RESULTCreateSearch | Create search table used to select active poll |
 | CONDITIONMarkFilterVote |  Mark items that has been filtered |
 | WalkNextState | Walks queries used to collect information for active state |
-
+| SNAPSHOTCreateSearch | Walks queries used to collect information for active state |
 
 |||
 
@@ -53,7 +53,7 @@ namespace details {
    export type condition = { ready?: boolean, table: string, id: string, value: string|number, simple?: string, operator?: number }
 
    export type page_construct = {
-      callback_action?: ((sMessage: string) => void),
+      callback_action?: ((sMessage: string, data?: any) => void);
       state?: { [key_name: string]: string|number|boolean }, // state items for page
       session?: string,
    }
@@ -76,6 +76,7 @@ export class CPageOne extends CPageSuper {
    m_sSearchMode: string;           // Search mode (this is top section in page), valid types are "hash", "field", "area", "personal"
    m_sSession: string;              // save session to manage reload from user, try to get older version of session avoiding to many users
    m_oTDVoter: CTableData;          // User data for voter
+   m_oUITableText: { [ key_name: string ]: CUITableText }; // cache ui table text items
    m_sViewMode: string;             // view mode page is in
    m_aVoter: [ number, string, string ];// key, alias and name for current voter
    m_aVoteHistory: number[];        // Local vote history on computer, this is to avoid abuse but is only for the current browser
@@ -91,6 +92,7 @@ export class CPageOne extends CPageSuper {
       this.m_oPoll = { poll: -1, vote: -1, count: 0 };
       this.m_sSession = o.session || null;
       this.m_oState = o.state || {};
+      this.m_oUITableText = {};
       this.m_sViewMode = "vote";          // In what mode selected poll is. "vote" = enable voting for voter, "count" = view vote count for selected poll
 
       this.m_aPageState = [
@@ -266,6 +268,9 @@ export class CPageOne extends CPageSuper {
          }
          const sQuery = aQuery[0];
          let oCommand = { command: "add_condition_to_query get_result", delete: 1, query: sQuery, set: "vote", count: 50, format: 1, start: 0 };
+         
+         if( sQuery === "poll_search" ) oCommand.count = 10;
+
          if( !sXml ) delete oCommand.delete;               // No condition then keep active conditions for query
          request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
          aQuery[ 1 ] = details.enumQueryState.waiting;                        // change state to waiting
@@ -388,7 +393,7 @@ export class CPageOne extends CPageSuper {
                   }
 
                   this.WalkNextState(); // Go to next step in active state
-
+                  return;
                }
             }
 
@@ -400,6 +405,9 @@ export class CPageOne extends CPageSuper {
             }
             else if(sQueryName === "poll_answer_filtercount") {
                this.RESULTCreatePollFilterCount("idPollOverview", oResult);
+            }
+            else if(sQueryName === "poll_search") {
+               this.RESULTCreateSearch("idPollSearch", oResult);
             }
          }  break;
          //case "load":
@@ -427,6 +435,14 @@ export class CPageOne extends CPageSuper {
                }
             }
             break;
+         default: {
+            let iPosition = sName.indexOf("get_query_information-");
+            if( iPosition === 0 ) {
+               if( oResult.name === "poll_search" ) {
+                  this.SNAPSHOTCreateSearch( oResult );
+               }
+            }
+         }
       }
 
    }
@@ -498,6 +514,20 @@ export class CPageOne extends CPageSuper {
 
       this.m_bFilterConditionCount = false;
       request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", hint: sQuery, json: request.GetJson(oCommand) }, sXml);
+   }
+
+   QUERYGetSearch( oCondition: { snapshot?: string } ) {
+      let request = this.app.request;
+      let sCommand: string = "";
+      let oCommand: {[k:string]: string|number} = { query: "poll_search", set: "vote", count: 100, format: 1, start: 0 };
+
+      if( oCondition.snapshot ) {
+         oCommand.name = oCondition.snapshot;
+         sCommand += " set_snapshot";
+      }
+      sCommand += " get_result";
+      oCommand.command = sCommand;
+      request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", hint: "poll_search", json: request.GetJson(oCommand) });
    }
 
 
@@ -965,7 +995,17 @@ export class CPageOne extends CPageSuper {
    RESULTCreateSearch( eRoot: string|HTMLElement, oResult: any ) {
       if(typeof eRoot === "string") eRoot = document.getElementById(eRoot);
 
-      let oTD = new CTableData({ id: oResult.id, name: oResult.name });
+      let oTT = this.m_oUITableText.poll_search;
+      let oTD: CTableData = oTT ? oTT.data : null;
+
+      if(oTD) {
+         oTD.ClearData("body");
+         oTD.ReadArray(oResult.table.body, { begin: 0 });
+         oTT.Render(); // render with small caps creates elements for body and renders values
+         return;
+      }
+
+      oTD = new CTableData({ id: oResult.id, name: oResult.name });
 
       const aHeader = oResult.table.header;
       CPageSuper.ReadColumnInformationFromHeader(oTD, aHeader, (iIndex, oColumn, oTD) => {
@@ -975,7 +1015,7 @@ export class CPageOne extends CPageSuper {
       });
 
       oTD.ReadArray(oResult.table.body, { begin: 0 });
-      oTD.COLUMNSetType( oTD.ROWGet(1) );
+      if( oTD.ROWGetCount() > 0 ) oTD.COLUMNSetType( oTD.ROWGet(1) );
 
       oTD.COLUMNSetPropertyValue("FName", "alias", "Namn");
       oTD.COLUMNSetPropertyValue("FDescription", "alias", "Beskrivning");
@@ -1033,7 +1073,7 @@ export class CPageOne extends CPageSuper {
          }
       };
 
-      let oTT = new CUITableText(options);
+      oTT = new CUITableText(options);
       oTD.UIAppend(oTT);
 
       oTT.Render();
@@ -1046,7 +1086,11 @@ export class CPageOne extends CPageSuper {
       });
 
       oTT.GetSection("body").focus({ preventScroll: true });
-      
+      this.m_oUITableText.poll_search = oTT;
+
+      eRoot.dataset.one = "1";                              // You do not need to fill this again
+      this.SNAPSHOTGetFor("poll_search");
+      this.CallOwner("table", { name: "poll_search", tt: oTT, td: oTD});
    }
 
 
@@ -1135,6 +1179,53 @@ export class CPageOne extends CPageSuper {
       
       request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", hint: sQuery, json: request.GetJson(oCommand) }, sXml);
    }
+
+   SNAPSHOTGetFor( sQuery ) {
+      let request = this.app.request;
+      let oCommand: {[key:string]: string|number} = { command: "get_query_information", query: sQuery, set: "vote" };
+      request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", json: request.GetJson(oCommand) });
+   }
+
+   /**
+    * Create dropdown for setting snapshots for selecting poll
+    * @param {any} oResult query data that contains snapshot information
+    */
+   SNAPSHOTCreateSearch( oResult: any ) {
+      let oTT = this.m_oUITableText.poll_search;
+      let eToolbar = oTT.GetSection("toolbar");
+
+      if( oResult.snapshots ) {
+         let eSelect = document.createElement("select");
+         oResult.snapshots.forEach((s: string, i: number) => {
+            let eOption = <HTMLOptionElement>document.createElement("option");
+            eOption.value = <string>s;
+            let sText = <string>s;
+            const sTitle = sText;
+            eOption.innerText = sText;
+
+            if( s === oResult.selected ) eOption.setAttribute("selected", "selected");
+
+            eSelect.appendChild(eOption);
+         });
+
+         /*
+         for( let i = 0; i < result.snapshots.length; i++ ) {
+            if( result.snapshots[i] === result.selected ) { result.snapshots[i] = { name: result.snapshots[i], selected: 1 }; break; }
+         }
+         */
+        
+        let eDiv = document.createElement("div");
+        eDiv.className = "select is-primary";
+        eDiv.appendChild( eSelect );
+        eToolbar.appendChild( eDiv );
+
+        eSelect.addEventListener( "change", e => {
+           const sSnapshot = (<HTMLSelectElement>e.srcElement).value;
+           this.QUERYGetSearch({ snapshot: sSnapshot });
+        });
+      }
+   }
+
 
 
    /**
