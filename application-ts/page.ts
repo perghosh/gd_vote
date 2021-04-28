@@ -1330,7 +1330,7 @@ export class CPage {
             if(sType === "click") {
                let eRow = <HTMLElement>e.srcElement;
                if( eRow.dataset.command ) {
-                  if( eRow.dataset.command === "all" ) this.QONDITIONRemove( "poll_list" );
+                  if( eRow.dataset.command === "all" ) this.CONDITIONRemove( "poll_list" );
                   return;
                }
                if( eRow.dataset.type !== "row" ) eRow = eRow.closest("[data-type]");
@@ -1338,7 +1338,7 @@ export class CPage {
                const iRow = parseInt( eRow.dataset.line, 10 );
 
                const sUuid = <string>oTD.CELLGetValue( iRow, "uuid");
-               this.QONDITIONRemove( "poll_list", sUuid );
+               this.CONDITIONRemove( "poll_list", sUuid );
             }
             return true;
          }
@@ -1394,7 +1394,7 @@ export class CPage {
     * @param {string} sQuery query that conditions are removed from
     * @param {string | string[]} _Uuid [description]
     */
-   QONDITIONRemove( sQuery: string, _Uuid?: string | string[] ) {
+   CONDITIONRemove( sQuery: string, _Uuid?: string | string[] ) {
       let sXml;
       let request = this.app.request;
       let oCommand: {[key:string]: string|number} = { command: "delete_condition_from_query get_result get_query_conditions", query: sQuery, set: "vote", count: 100, format: 1, start: 0 };

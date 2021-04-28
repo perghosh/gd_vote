@@ -25,10 +25,10 @@ pageone = page logic for managing one vote, user can not select any votes. activ
 | RESULTCreateQuestionPanel | Create panels for each question that belongs to current selected poll. Like containers for selectable votes |
 | RESULTCreateVote | Create vote for poll question. Creates markup for possible answers to poll question |
 | RESULTCreateVoteCount | Create markup showing vote count on each answer for poll question |
-| RESULTCreateSearch | Create search table used to select active poll |
+| RESULTCreateSearch | Create search table used to select active poll, toolbar with navigation is also created here |
 | CONDITIONMarkFilterVote |  Mark items that has been filtered |
 | WalkNextState | Walks queries used to collect information for active state |
-| SNAPSHOTCreateSearch | Walks queries used to collect information for active state |
+| PAGECreateToolbarForSearch | Walks queries used to collect information for active state |
 
 |||
 
@@ -37,6 +37,8 @@ https://dev.to/plebras/want-to-learn-d3-let-s-make-a-bar-chart-3o5n
 */
 import { CTableData, enumReturn } from "./../library/TableData.js";
 import { CTableDataTrigger } from "./../library/TableDataTrigger.js";
+import { CUIPagerPreviousNext } from "./../library/UIPagerPreviousNext.js";
+import { CDispatch } from "./../library/Dispatch.js";
 import { CUITableText } from "./../library/UITableText.js";
 import { CQuery } from "./../server/Query.js";
 import { CPageSuper, CPageState } from "./pagesuper.js";
@@ -210,7 +212,7 @@ export class CPageOne extends CPageSuper {
             const sQuery = aQuery[0];
             let oCommand = { command: "add_condition_to_query get_result", delete: 1, query: sQuery, set: "vote", count: 50, format: 1, start: 0 };
             if (sQuery === "poll_search")
-                oCommand.count = 10;
+                oCommand.count = 10; // max 10 rows for search
             if (!sXml)
                 delete oCommand.delete; // No condition then keep active conditions for query
             request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
@@ -380,7 +382,7 @@ export class CPageOne extends CPageSuper {
                 let iPosition = sName.indexOf("get_query_information-");
                 if (iPosition === 0) {
                     if (oResult.name === "poll_search") {
-                        this.SNAPSHOTCreateSearch(oResult);
+                        this.PAGECreateToolbarForSearch(oResult);
                     }
                 }
             }
@@ -438,9 +440,10 @@ export class CPageOne extends CPageSuper {
         request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", hint: sQuery, json: request.GetJson(oCommand) }, sXml);
     }
     QUERYGetSearch(oCondition) {
+        const iStart = oCondition.start || 0;
         let request = this.app.request;
         let sCommand = "";
-        let oCommand = { query: "poll_search", set: "vote", count: 100, format: 1, start: 0 };
+        let oCommand = { query: "poll_search", set: "vote", count: 10, format: 1, start: iStart };
         if (oCondition.snapshot) {
             oCommand.name = oCondition.snapshot;
             sCommand += " set_snapshot";
@@ -848,6 +851,7 @@ export class CPageOne extends CPageSuper {
             oTD.ClearData("body");
             oTD.ReadArray(oResult.table.body, { begin: 0 });
             oTT.Render(); // render with small caps creates elements for body and renders values
+            oTT.row_page = oResult.page; // set active page
             return;
         }
         oTD = new CTableData({ id: oResult.id, name: oResult.name });
@@ -887,13 +891,30 @@ export class CPageOne extends CPageSuper {
                     this.SetActiveState("body.select");
                     this.SetActivePoll(iPoll); // activate poll
                 }
+                else if (oEventData.iEventAll === 65560 /* BeforeMove */) {
+                    const o = oEventData.information;
+                    const iMoveTo = o.start + o.offset;
+                    if (o.offset < 0 && iMoveTo >= 0) {
+                        this.QUERYGetSearch({ start: iMoveTo > 0 ? iMoveTo : 0 });
+                    }
+                    else if (o.offset > 0 && o.count === o.max) {
+                        this.QUERYGetSearch({ start: iMoveTo });
+                    }
+                    //(<CUITableText>oEventData.dataUI).SetProperty( "rowstart", iMoveTo );               // set new start row
+                    //if( iMoveTo < 0 || (iMoveTo > 0  && o.count >= o.max) ) this.QUERYGetSearch({ start: iMoveTo > 0 ? iMoveTo : 0  });
+                    return false; // get new result from server, no internal update return false to cancel command
+                }
             } });
+        let oDispatch = new CDispatch();
         let options = {
+            dispatch: oDispatch,
             edit: true,
+            max: 10,
             parent: eRoot,
             section: ["toolbar", "table.header", "table.body"],
-            table: oTD,
+            server: true,
             style: oStyle,
+            table: oTD,
             trigger: oTrigger,
             callback_render: (sType, e, sSection, oColumn) => {
                 if (sType === "beforeInput") {
@@ -985,7 +1006,7 @@ export class CPageOne extends CPageSuper {
      * @param {string} sQuery query that conditions are removed from
      * @param {string | string[]} _Uuid [description]
      */
-    QONDITIONRemove(sQuery, _Uuid) {
+    CONDITIONRemove(sQuery, _Uuid) {
         let sXml;
         let request = this.app.request;
         let oCommand = { command: "delete_condition_from_query get_result get_query_conditions", query: sQuery, set: "vote", count: 100, format: 1, start: 0 };
@@ -1004,12 +1025,16 @@ export class CPageOne extends CPageSuper {
         request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", json: request.GetJson(oCommand) });
     }
     /**
-     * Create dropdown for setting snapshots for selecting poll
+     * Create dropdown for setting snapshots for selecting poll and pager to move in result
      * @param {any} oResult query data that contains snapshot information
      */
-    SNAPSHOTCreateSearch(oResult) {
+    PAGECreateToolbarForSearch(oResult) {
         let oTT = this.m_oUITableText.poll_search;
         let eToolbar = oTT.GetSection("toolbar");
+        eToolbar.style.display = "flex";
+        //
+        // ## Create snapshot drop down
+        //
         if (oResult.snapshots) {
             let eSelect = document.createElement("select");
             oResult.snapshots.forEach((s, i) => {
@@ -1035,6 +1060,59 @@ export class CPageOne extends CPageSuper {
                 const sSnapshot = e.srcElement.value;
                 this.QUERYGetSearch({ snapshot: sSnapshot });
             });
+        }
+        //
+        // ## Create pager
+        //
+        {
+            let oDispatch = this.m_oUITableText.poll_search.dispatch;
+            let oTT = this.m_oUITableText.poll_search;
+            let oTD = oTT ? oTT.data : null;
+            let eContainer = document.createElement("div");
+            eContainer.style.display = "inline-block";
+            eContainer.style.marginLeft = "auto";
+            eToolbar.appendChild(eContainer); // add container to toolbar
+            let oPager = new CUIPagerPreviousNext({
+                dispatch: oDispatch,
+                members: { page_max_count: 10, page_count: oTT.ROWGetCount() },
+                parent: eContainer,
+                callback_action: function (sAction, e) {
+                    const [sType, sItem] = sAction.split(".");
+                    if (sType === "render" || sType === "create") {
+                        let eComponent = e.eElement;
+                        let ePrevious = eComponent.querySelector('[data-type="previous"]');
+                        let eNext = eComponent.querySelector('[data-type="next"]');
+                        if (sType === "create") {
+                            ePrevious.className = "button is-primary is-outlined mr-1";
+                            eNext.className = "button is-primary is-outlined";
+                        }
+                        else {
+                            const iPage = this.members.page;
+                            const iCount = this.members.page_count;
+                            const iMax = this.members.page_max_count;
+                            if (iPage === 0) {
+                                ePrevious.disabled = true;
+                                ePrevious.innerText = "Föregående";
+                            }
+                            else {
+                                ePrevious.disabled = false;
+                                ePrevious.innerText = "Föregående (" + (iPage) + ")";
+                            }
+                            if (iCount < iMax) {
+                                eNext.disabled = true;
+                                eNext.innerText = "Nästa";
+                            }
+                            else {
+                                eNext.disabled = false;
+                                eNext.innerText = "Nästa (" + (iPage + 2) + ")";
+                            }
+                        }
+                    }
+                    return true;
+                }
+            });
+            oDispatch.AddChain(oPager, oTT); // connect pager with ui table
+            oDispatch.AddChain(oTT, [oPager]); // connect ui table with pager
         }
     }
     /**

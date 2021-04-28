@@ -78,6 +78,7 @@ export class CUITableText {
         this.m_iRowCountMax = o.max || -1;
         this.m_aSection = o.section || ["toolbar", "title", "header", "body", "footer", "statusbar"]; // sections "header" and "body" are required
         this.m_aSelected = [];
+        this.m_bServer = o.server || false;
         this.m_iState = o.state || 0;
         this.m_oTableData = o.table || null;
         this.m_oTableDataTrigger = o.trigger || null;
@@ -136,17 +137,24 @@ export class CUITableText {
      */
     get data() { return this.m_oTableData; }
     get trigger() { return this.m_oTableDataTrigger; }
-    get state() { return this.m_iState; }
-    get dispatch() { return this.m_oDispatch; }
+    get dispatch() { return this.m_oDispatch; } // get dispatcher if any connected
     set dispatch(oDispatch) { this.m_oDispatch = oDispatch; }
     /**
      * Get edits object
      */
     get edits() { return this.m_oEdits; }
-    /**
-     * Get selected cells
-     */
-    get selected() { return this.m_aSelected; }
+    // ## row attributes 
+    get row_count() { return this.m_iRowCount; } // get number of rows in table
+    get row_page() { return this.m_iRowStart / this.m_iRowCountMax; } // calculate active page
+    set row_page(iPage) {
+        this.m_iRowStart = iPage * this.m_iRowCountMax;
+        if (this.dispatch) {
+            this.dispatch.NotifyConnected(this, { command: "set.page", data: { page: this.row_page } });
+        }
+    }
+    get row_max() { return this.m_iRowCountMax; } // max number of rows in ui table
+    get selected() { return this.m_aSelected; } // selected cells 
+    get state() { return this.m_iState; } // custom states for ui table, not used internally
     /**
      * Ask if state is on or off. state can be many things
      * @param i
@@ -201,20 +209,25 @@ export class CUITableText {
                 break;
             case "move":
                 {
+                    let iMoveRows = this.m_iRowCountMax !== -1 ? this.m_iRowCountMax : this.m_iRowCount;
                     if (oMessage?.data?.trigger & 65536 /* TRIGGER_BEFORE */) {
-                        if (sType === "previous" && this.m_iRowStart <= 0)
+                        if (sType === "previous" && this.m_iRowStart <= 0) {
+                            this.ROWMove(-iMoveRows, true);
                             return false;
+                        }
                         else if (sType === "next") {
                             // Trying to move beyond number of rows in table data
-                            if (this.data.ROWGetCount() < (this.m_iRowStart + this.m_iRowOffsetStart + this.m_iRowCountMax))
+                            if (this.data.ROWGetCount() < (this.m_iRowStart + this.m_iRowOffsetStart + this.m_iRowCountMax)) {
+                                this.ROWMove(iMoveRows, true);
                                 return false;
+                            }
                         }
                         return;
                     }
                     if (sType === "previous")
-                        this.ROWMove(-this.m_iRowCountMax); // move back one "page"
+                        this.ROWMove(-iMoveRows); // move back one "page"
                     else if (sType === "next")
-                        this.ROWMove(this.m_iRowCountMax); // move forward one "page"
+                        this.ROWMove(iMoveRows); // move forward one "page"
                 }
                 break;
         }
@@ -579,7 +592,9 @@ export class CUITableText {
         let o = {};
         if (this.m_iRowCountMax >= 0)
             o.max = this.m_iRowCountMax; // if max rows returned is set
-        if (this.m_iRowStart >= 0)
+        if (this.m_bServer === true)
+            o.begin = 0; // data is from server and fetched dynamically, table data only has the active page data
+        else if (this.m_iRowStart >= 0)
             o.begin = this.m_iRowStart + this.m_iRowOffsetStart;
         if (this.m_aInput) {
             this.m_aInput[0] = -1;
@@ -899,26 +914,34 @@ export class CUITableText {
         }
         return aError.length ? aError : true;
     }
-    ROWMove(iOffset) {
+    /**
+     * Move to row, rows are found in table data and this modifies the first row that is shown from table data
+     * @param {number}  iOffset distance to new row position
+     * @param {boolean} bFake   when true then no movement is done, just triggers. this is if data is fetched from server
+     */
+    ROWMove(iOffset, bFake) {
         let iStart = this.m_iRowStart;
+        let oTD;
+        const oTrigger = this.trigger; // Get trigger object with trigger logic
+        if (oTrigger) {
+            oTD = this._get_triggerdata();
+            oTD.information = { offset: iOffset, start: iStart, count: this.m_iRowCount, max: this.m_iRowCountMax }; // move data
+            oTD.iEvent = 65560 /* BeforeMove */;
+            const bOk = oTrigger.Trigger(65560 /* BeforeMove */, oTD);
+            if (bOk === false)
+                return;
+        }
         iStart += iOffset;
         if (iStart < 0)
             iStart = 0;
         if (iStart !== this.m_iRowStart) {
-            let oTD;
-            const oTrigger = this.trigger; // Get trigger object with trigger logic
-            if (oTrigger) {
-                oTD = this._get_triggerdata();
-                oTD.iEvent = 65560 /* BeforeMove */;
-                const bOk = oTrigger.Trigger(65560 /* BeforeMove */, oTD);
-                if (bOk === false)
-                    return;
-            }
-            this.m_iRowStart = iStart;
+            if (bFake !== true)
+                this.m_iRowStart = iStart;
             if (this.dispatch) {
                 this.dispatch.NotifyConnected(this, { command: "move", data: { start: iStart, count: this.m_iRowCount, max: this.m_iRowCountMax } });
             }
-            this.Render();
+            if (bFake !== true)
+                this.Render();
             if (oTrigger) {
                 oTD.iEvent = 131097 /* AfterMove */;
                 oTrigger.Trigger(131097 /* AfterMove */, oTD);

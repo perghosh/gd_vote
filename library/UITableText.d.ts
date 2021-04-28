@@ -35,6 +35,7 @@ declare namespace details {
         settings?: {
             layout?: string;
         };
+        server?: boolean;
         state?: number;
         style?: {
             header?: string;
@@ -115,6 +116,7 @@ export declare class CUITableText implements IUITableData {
     m_aRowPhysicalIndex: number[];
     m_oRowRows: CRowRows;
     m_aSelected: [number, number][];
+    m_bServer: boolean;
     m_iState: number;
     m_oTableData: CTableData;
     m_oTableDataTrigger: CTableDataTrigger;
@@ -167,17 +169,18 @@ export declare class CUITableText implements IUITableData {
      */
     get data(): CTableData;
     get trigger(): CTableDataTrigger;
-    get state(): number;
     get dispatch(): CDispatch;
     set dispatch(oDispatch: CDispatch);
     /**
      * Get edits object
      */
     get edits(): edit.CEdits;
-    /**
-     * Get selected cells
-     */
+    get row_count(): number;
+    get row_page(): number;
+    set row_page(iPage: number);
+    get row_max(): number;
     get selected(): [number, number][];
+    get state(): number;
     /**
      * Ask if state is on or off. state can be many things
      * @param i
@@ -337,7 +340,12 @@ export declare class CUITableText implements IUITableData {
      * @return {boolean}     [description]
      */
     ROWValidate(_Row: number | number[]): boolean | [number, number, unknown, unknown][];
-    ROWMove(iOffset: number): void;
+    /**
+     * Move to row, rows are found in table data and this modifies the first row that is shown from table data
+     * @param {number}  iOffset distance to new row position
+     * @param {boolean} bFake   when true then no movement is done, just triggers. this is if data is fetched from server
+     */
+    ROWMove(iOffset: number, bFake?: boolean): void;
     /**
      * Get parent section element for element sent as argument
      * @param {HTMLElement} eElement element that sections is returned for.

@@ -246,18 +246,20 @@ div[data-section="container"]
       // #region LOAD_PAGE_COMPONENETS
 
 
-      import { CTableData, browser } from "./library/TableData.js";
       import { edit } from "./library/TableDataEdit.js";
+      import { CTableData, browser } from "./library/TableData.js";
       import { CTableDataTrigger } from "./library/TableDataTrigger.js";
       import { SetTriggerName } from "./library/TableDataTriggerNames.js";
       import { CUITableText } from "./library/UITableText.js";
+      import { CUIPagerPreviousNext } from "./library/UIPagerPreviousNext.js";
+      import { CDispatch } from "./library/Dispatch.js";
 
       import { CRequest } from "./server/ServerRequest.js";
       import { CQuery } from "./server/Query.js";
 
       import { CApplication } from "./application/application.js";
-      //import { CPageSuper } from "./application/pagesuper.js";
       import { CPageOne } from "./application/pageone.js";
+      
 
 
       window.edit = edit;
@@ -265,6 +267,8 @@ div[data-section="container"]
       window.CTableData_browser = browser;
       window.CUITableText = CUITableText;
       window.CTableDataTrigger = CTableDataTrigger;
+      window.CUIPagerPreviousNext = CUIPagerPreviousNext;
+      window.CDispatch = CDispatch;
 
       window.CApplication = CApplication;
       //window.CPageSuper = CPageSuper;
