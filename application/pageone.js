@@ -884,6 +884,8 @@ export class CPageOne extends CPageSuper {
                 if (oEventData.iEventAll === 131085 /* AfterSelect */) { // cell is selected
                     // try to get the poll id for row
                     const a = oEventData.information;
+                    if (a[0] === -1)
+                        return; // -1 = no selected
                     const iRowData = a[3]; // index 3 has index to row that is clicked
                     // Get poll id from table data for requested row
                     const oTD = oEventData.data; // get table data
@@ -893,19 +895,18 @@ export class CPageOne extends CPageSuper {
                 }
                 else if (oEventData.iEventAll === 65560 /* BeforeMove */) {
                     const o = oEventData.information;
-                    const iMoveTo = o.start + o.offset;
-                    if (o.offset < 0 && iMoveTo >= 0) {
-                        this.QUERYGetSearch({ start: iMoveTo > 0 ? iMoveTo : 0 });
+                    // ## QUERYGetSearch is used to get search data from server
+                    const iMoveTo = o.start + o.offset; // row that we are going to move to
+                    if (o.offset < 0 && iMoveTo >= 0) { // If offset is negative that means we move backwards
+                        this.QUERYGetSearch({ start: iMoveTo > 0 ? iMoveTo : 0 }); // Can't move to negative row
                     }
                     else if (o.offset > 0 && o.count === o.max) {
                         this.QUERYGetSearch({ start: iMoveTo });
                     }
-                    //(<CUITableText>oEventData.dataUI).SetProperty( "rowstart", iMoveTo );               // set new start row
-                    //if( iMoveTo < 0 || (iMoveTo > 0  && o.count >= o.max) ) this.QUERYGetSearch({ start: iMoveTo > 0 ? iMoveTo : 0  });
                     return false; // get new result from server, no internal update return false to cancel command
                 }
             } });
-        let oDispatch = new CDispatch();
+        let oDispatch = new CDispatch(); // Dispatcher that manages communication between pager and ui table
         let options = {
             dispatch: oDispatch,
             edit: true,
@@ -916,12 +917,13 @@ export class CPageOne extends CPageSuper {
             style: oStyle,
             table: oTD,
             trigger: oTrigger,
-            callback_render: (sType, e, sSection, oColumn) => {
+            callback_render: function (sType, e, sSection, oColumn) {
                 if (sType === "beforeInput") {
                     let eTR = e.eElement.closest("tr");
                     let eTable = eTR.closest("table");
                     eTable.querySelectorAll("tr").forEach(e => e.classList.remove("selected"));
                     eTR.classList.add("selected");
+                    this.INPUTClear();
                     return false;
                 }
             }

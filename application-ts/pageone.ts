@@ -1045,6 +1045,7 @@ export class CPageOne extends CPageSuper {
          if( oEventData.iEventAll === enumTrigger.AfterSelect ) {               // cell is selected
             // try to get the poll id for row
             const a = <[number,number,HTMLElement,number,number]>oEventData.information;
+            if( a[0] === -1 ) return;                      // -1 = no selected
             const iRowData = a[3]; // index 3 has index to row that is clicked
 
             // Get poll id from table data for requested row
@@ -1057,35 +1058,32 @@ export class CPageOne extends CPageSuper {
          else if( oEventData.iEventAll === enumTrigger.BeforeMove ) {
             const o: { offset: number, start: number, count: number,  max: number } = <any>oEventData.information;
 
-            const iMoveTo = o.start + o.offset;
-            if( o.offset < 0 && iMoveTo >= 0 ) {
-               this.QUERYGetSearch({ start: iMoveTo > 0 ? iMoveTo : 0 });
+            // ## QUERYGetSearch is used to get search data from server
+            const iMoveTo = o.start + o.offset; // row that we are going to move to
+            if( o.offset < 0 && iMoveTo >= 0 ) {// If offset is negative that means we move backwards
+               this.QUERYGetSearch({ start: iMoveTo > 0 ? iMoveTo : 0 });// Can't move to negative row
             }
             else if( o.offset > 0 && o.count === o.max ) {
                this.QUERYGetSearch({ start: iMoveTo });
             }
 
-
-            //(<CUITableText>oEventData.dataUI).SetProperty( "rowstart", iMoveTo );               // set new start row
-            //if( iMoveTo < 0 || (iMoveTo > 0  && o.count >= o.max) ) this.QUERYGetSearch({ start: iMoveTo > 0 ? iMoveTo : 0  });
-
             return false;                                   // get new result from server, no internal update return false to cancel command
          }
       }}); 
 
-      let oDispatch = new CDispatch();
+      let oDispatch = new CDispatch(); // Dispatcher that manages communication between pager and ui table
 
       let options = {
          dispatch: oDispatch,                      // dispatcher used to communicate with pager
          edit: true,                               // enable events for selecting table cells
-         max: 10,
+         max: 10,                                  // max number of rows displayed
          parent: eRoot,                            // container
          section: [ "toolbar", "table.header", "table.body" ],// sections to create
          server: true,                             // use server data
          style: oStyle,                            // styling
          table: oTD,                               // source data
          trigger: oTrigger,                        // set trigger object, this will enable triggers for the search table
-         callback_render: ( sType: string, e: EventDataTable, sSection: string, oColumn: any ) => {
+         callback_render: function( sType: string, e: EventDataTable, sSection: string, oColumn: any ) {
             if( sType === "beforeInput" ) {
                let eTR = e.eElement.closest("tr");
                let eTable = eTR.closest("table");
@@ -1093,6 +1091,7 @@ export class CPageOne extends CPageSuper {
                eTable.querySelectorAll("tr").forEach( e => e.classList.remove("selected") );
 
                eTR.classList.add("selected");
+               this.INPUTClear();
                return false;
             }
          }
@@ -1270,9 +1269,9 @@ export class CPageOne extends CPageSuper {
          eToolbar.appendChild(eContainer);   // add container to toolbar
 
          let oPager = new CUIPagerPreviousNext({
-            dispatch: oDispatch,
-            members: { page_max_count: 10, page_count: oTT.ROWGetCount() },
-            parent: eContainer,
+            dispatch: oDispatch, // dispatcher used to communicate with ui table
+            members: { page_max_count: 10, page_count: oTT.ROWGetCount() }, // configure page sections, how many rows each page has
+            parent: eContainer, 
             callback_action: function (sAction, e): boolean {
                const [sType, sItem] = sAction.split(".");
                if(sType === "render" || sType === "create") {
@@ -1305,7 +1304,6 @@ export class CPageOne extends CPageSuper {
                         eNext.disabled = false;
                         eNext.innerText = "Nästa (" + (iPage + 2) + ")";   
                      }
-                     
                   }
                }
 

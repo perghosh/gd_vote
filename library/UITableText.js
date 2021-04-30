@@ -1077,6 +1077,22 @@ export class CUITableText {
             oTrigger.Trigger(131085 /* AfterSelect */, oTD, a);
         }
     }
+    /**
+     * Clear input item, this doesnt dispach any event. it just clears value if input is created
+     */
+    INPUTClear() {
+        if (this.m_aInput) {
+            const a = [...this.m_aInput];
+            this.m_aInput = [-1, -1, null, -1, -1];
+            return a;
+        }
+        return null;
+    }
+    /**
+     * Move active input based on specified move operation
+     * @param {enumMove} e How input is moved
+     * @param {boolean}  bRender if body is rendered after move, this will update complete table with new input
+     */
     INPUTMove(e, bRender) {
         let [iR, iC] = this.m_aInput;
         if (e < 16 /* page_up */) {
@@ -1119,8 +1135,6 @@ export class CUITableText {
             iR = 0;
         else if (iR >= this.m_iRowCount)
             iR = this.m_iRowCount - 1;
-        //let eElement = this.ELEMENTGetCell(iR,iC);
-        //this.m_aInput = [ iR, iC, eElement ];
         if (e !== 0 /* validate */)
             this.INPUTSet(iR, iC);
         if (bRender === true)

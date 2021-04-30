@@ -400,6 +400,15 @@ export declare class CUITableText implements IUITableData {
     INPUTSet(iR: number, iC: number): void;
     INPUTSet(aRC: [number, number]): void;
     INPUTSet(): void;
+    /**
+     * Clear input item, this doesnt dispach any event. it just clears value if input is created
+     */
+    INPUTClear(): [number, number, HTMLElement, number, number];
+    /**
+     * Move active input based on specified move operation
+     * @param {enumMove} e How input is moved
+     * @param {boolean}  bRender if body is rendered after move, this will update complete table with new input
+     */
     INPUTMove(e: enumMove, bRender?: boolean): void;
     /**
      * Activate input fields or field for selected row or cell.
