@@ -1,5 +1,8 @@
 ﻿/*
 
+dynamic imports
+https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import#dynamic_imports
+
 pageone = page logic for managing one vote, user can not select any votes. active vote is sent as parameter
 
 # Navigate
@@ -15,16 +18,13 @@ pageone = page logic for managing one vote, user can not select any votes. activ
 | QUERYGetPollOverview | Get information about selected poll. query = poll_overview. query = `poll_overview` |
 | QUERYGetPollLinks | Get links for poll. Query used is `poll_links` |
 | QUERYGetPollFilterCount | Get poll result (votes are counted) |
-| RESULTCreatePollList | Create drop-down with active polls |
-| RESULTCreateLogin | Create login section |
 | RESULTCreateFindVoter | Result from finding voter, this is called if user tries to login |
-| RESULTCreatePollHashtags | Create hash tags to filter from |
 | RESULTCreatePollOverview | Process result from  `poll_overview`|
 | RESULTCreatePollOverviewLinks | Process result from `poll_links` and render these for user |
-| RESULTCreatePollFilterCount | Create table with poll result |
+| RESULTCreatePollFilterCount | Create table with poll vote count for each answer |
 | RESULTCreateQuestionPanel | Create panels for each question that belongs to current selected poll. Like containers for selectable votes |
 | RESULTCreateVote | Create vote for poll question. Creates markup for possible answers to poll question |
-| RESULTCreateVoteCount | Create markup showing vote count on each answer for poll question |
+| RESULTCreateVoteCountAndFilter | Create markup showing vote count with filter logic on each answer for poll question |
 | RESULTCreateSearch | Create search table used to select active poll, toolbar with navigation is also created here |
 | CONDITIONMarkFilterVote |  Mark items that has been filtered |
 | WalkNextState | Walks queries used to collect information for active state |
@@ -58,6 +58,7 @@ namespace details {
       callback_action?: ((sMessage: string, data?: any) => void);
       state?: { [key_name: string]: string|number|boolean }, // state items for page
       session?: string,
+      set?: string,
    }
 }
 
@@ -65,6 +66,7 @@ namespace details {
 export class CPageOne extends CPageSuper {
    m_oD3Bar: CD3Bar;                // manage d3 bar for vote result
    m_bFilterConditionCount: boolean; // there are filter conditions
+   m_sQueriesSet: string;            // active query set
    m_aPageState: CPageState[];
    m_oPageState: CPageState;        // current page state that is being processed
    /**
@@ -92,6 +94,7 @@ export class CPageOne extends CPageSuper {
       this.m_bFilterConditionCount = false;
 
       this.m_oPoll = { poll: -1, vote: -1, count: 0 };
+      this.m_sQueriesSet = o.set || "";
       this.m_sSession = o.session || null;
       this.m_oState = o.state || {};
       this.m_oUITableText = {};
@@ -117,6 +120,7 @@ export class CPageOne extends CPageSuper {
 
    get app() { return this.m_oApplication; }                                   // get application object
    get poll() { return this.m_oPoll; }
+   get queries_set() : string { return this.m_sQueriesSet; };
    get state() { return this.m_oState; }                                       // get state object
 
    get search_mode() { return this.m_sSearchMode; }
@@ -269,7 +273,7 @@ export class CPageOne extends CPageSuper {
             sXml = <string>oQuery.CONDITIONGetXml();
          }
          const sQuery = aQuery[0];
-         let oCommand = { command: "add_condition_to_query get_result", delete: 1, query: sQuery, set: "vote", count: 50, format: 1, start: 0 };
+         let oCommand = { command: "add_condition_to_query get_result", delete: 1, query: sQuery, set: this.queries_set, count: 50, format: 1, start: 0 };
          
          if( sQuery === "poll_search" ) oCommand.count = 10;// max 10 rows for search
 
@@ -350,7 +354,7 @@ export class CPageOne extends CPageSuper {
       });
       
       const sXml = (new XMLSerializer()).serializeToString(oDocument);
-      let oCommand = { command: "add_rows", query: "poll_vote", set: "vote", table: "TPollVote1" };
+      let oCommand = { command: "add_rows", query: "poll_vote", set: this.queries_set, table: "TPollVote1" };
       let request = this.app.request;
       request.Get("SCRIPT_Run", { file: "PAGE_result_edit.lua", json: request.GetJson(oCommand) }, sXml);
       this.poll.vote = this.poll.poll;                      // keep poll index for later when response from server is returned
@@ -378,7 +382,7 @@ export class CPageOne extends CPageSuper {
                   switch(sQueryName) {
                      case "poll_question_list": this.RESULTCreateQuestionPanel( this.m_oPageState.container, oResult ); break;
                      case "poll_answer": this.RESULTCreateVote( this.m_oPageState.container, oResult ); break;
-                     case "poll_answer_count": this.RESULTCreateVoteCount( this.m_oPageState.container, oResult ); break;
+                     case "poll_answer_count": this.RESULTCreateVoteCountAndFilter( this.m_oPageState.container, oResult ); break;
                      case "poll_search": this.RESULTCreateSearch( this.m_oPageState.container, oResult ); break;
                      default: console.assert( false, `Result for ${sQueryName} has no stub` );
                   }
@@ -462,7 +466,7 @@ export class CPageOne extends CPageSuper {
       });
       let sXml = <string>oQuery.CONDITIONGetXml();
 
-      let oCommand = { command: "add_condition_to_query get_result", delete: 1, query: "poll_overview", set: "vote", count: 50, format: 1, start: 0 };
+      let oCommand = { command: "add_condition_to_query get_result", delete: 1, query: "poll_overview", set: this.queries_set, count: 50, format: 1, start: 0 };
       request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
    }
 
@@ -478,7 +482,7 @@ export class CPageOne extends CPageSuper {
       });
       let sXml = <string>oQuery.CONDITIONGetXml();
 
-      let oCommand = { command: "add_condition_to_query get_result", delete: 1, query: "poll_links", set: "vote", count: 50, format: 1, start: 0 };
+      let oCommand = { command: "add_condition_to_query get_result", delete: 1, query: "poll_links", set: this.queries_set, count: 50, format: 1, start: 0 };
       request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
    }
 
@@ -495,7 +499,7 @@ export class CPageOne extends CPageSuper {
       const sQuery = "poll_answer_filtercount";
 
       let aCondition: any[];
-      let oCommand: {[k:string]: string|number} = { command: "add_condition_to_query get_result", query: sQuery, set: "vote", count: 100, format: 1, start: 0 };
+      let oCommand: {[k:string]: string|number} = { command: "add_condition_to_query get_result", query: sQuery, set: this.queries_set, count: 100, format: 1, start: 0 };
 
       if( typeof _1 === "number" ) { 
          aCondition = [ { table: "TPoll1", id: "PollK", value: _1 } ];
@@ -522,7 +526,7 @@ export class CPageOne extends CPageSuper {
       const iStart = oCondition.start || 0;
       let request = this.app.request;
       let sCommand: string = "";
-      let oCommand: {[k:string]: string|number} = { query: "poll_search", set: "vote", count: 10, format: 1, start: iStart };
+      let oCommand: {[k:string]: string|number} = { query: "poll_search", set: this.queries_set, count: 10, format: 1, start: iStart };
 
       if( oCondition.snapshot ) {
          oCommand.name = oCondition.snapshot;
@@ -733,6 +737,11 @@ export class CPageOne extends CPageSuper {
       }
    }
 
+   /**
+    * Generate table that lists all how many votes each answer has based on selected vote and filter
+    * @param {string | HTMLElement} eRoot container element
+    * @param {any} oResult result data
+    */
    RESULTCreatePollFilterCount(eRoot: string | HTMLElement, oResult: any) {
       if(typeof eRoot === "string") eRoot = document.getElementById(eRoot);
 
@@ -904,11 +913,11 @@ export class CPageOne extends CPageSuper {
 
 
    /**
-    * Create markup showing vote count on each answer for poll question
-    * @param {string|HTMLElement} eRoot
+    * Create markup showing vote count on each answer for poll question. This is used to filter result
+    * @param {string|HTMLElement} eRoot container element
     * @param {any} oResult server results for each answer to questions in selected poll
     */
-   RESULTCreateVoteCount(eRoot: string|HTMLElement, oResult: any) {
+   RESULTCreateVoteCountAndFilter(eRoot: string|HTMLElement, oResult: any) {
       if(typeof eRoot === "string") eRoot = document.getElementById(eRoot);
 
       let oTD = new CTableData({ id: oResult.id, name: oResult.name });
@@ -968,7 +977,7 @@ export class CPageOne extends CPageSuper {
       oTD.UIAppend(oTT);
 
       oTT.COLUMNSetRenderer(0, (e, v, a) => {
-         e.innerHTML = `<button class="button is-primary is-light" data-answer="${v}">Ta bort</button>`;
+         e.innerHTML = `<button class="button is-primary is-light is-small" data-answer="${v}">Ta bort</button>`;
       });
 
       oTT.Render();
@@ -978,7 +987,7 @@ export class CPageOne extends CPageSuper {
          if( eButton.tagName === "BUTTON" ) {
             if( typeof eButton.dataset.uuid === "string" ) {
                this.QUERYGetPollFilterCount({ condition: eButton.dataset.uuid });
-               eButton.className = "button is-primary is-light";
+               eButton.className = "button is-primary is-light is-small";
                eButton.innerText = "Ta bort";
                delete eButton.dataset.uuid;
             }
@@ -1175,7 +1184,7 @@ export class CPageOne extends CPageSuper {
             this.m_bFilterConditionCount = true;
             // find button with filter
             let eButton = this.ELEMENTGetFilterButton( parseInt( <string>oTD.CELLGetValue( i, "value" ), 10 ) );
-            eButton.className = "button is-warning is-light";
+            eButton.className = "button is-warning is-light is-small";
             eButton.innerText = "Lägg till";
             eButton.dataset.uuid = <string>oTD.CELLGetValue( i, "uuid" );
          }
@@ -1190,7 +1199,7 @@ export class CPageOne extends CPageSuper {
    CONDITIONRemove( sQuery: string, _Uuid?: string | string[] ) {
       let sXml;
       let request = this.app.request;
-      let oCommand: {[key:string]: string|number} = { command: "delete_condition_from_query get_result get_query_conditions", query: sQuery, set: "vote", count: 100, format: 1, start: 0 };
+      let oCommand: {[key:string]: string|number} = { command: "delete_condition_from_query get_result get_query_conditions", query: sQuery, set: this.queries_set, count: 100, format: 1, start: 0 };
 
       if( _Uuid === undefined ) {  // no uuid, then delete all
          request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", hint: sQuery, json: request.GetJson(oCommand) }, sXml);
@@ -1206,7 +1215,7 @@ export class CPageOne extends CPageSuper {
 
    SNAPSHOTGetFor( sQuery ) {
       let request = this.app.request;
-      let oCommand: {[key:string]: string|number} = { command: "get_query_information", query: sQuery, set: "vote" };
+      let oCommand: {[key:string]: string|number} = { command: "get_query_information", query: sQuery, set: this.queries_set };
       request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", json: request.GetJson(oCommand) });
    }
 

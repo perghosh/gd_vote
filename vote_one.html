@@ -140,7 +140,7 @@ div[data-section="container"]
          }
          else if(sOperation === "server-session") {
             if( !this.page) {
-               this.m_oPage = new CPageOne(this, {callback_action: PAGE_Callback, read_url: true});
+               this.m_oPage = new CPageOne(this, {callback_action: PAGE_Callback, read_url: true, set: "vote"});
                const sSession = window.app.request.session;
                CPageOne.HISTORYSerializeSession( true, sSession );
 
