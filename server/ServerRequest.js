@@ -1,6 +1,7 @@
 export class CRequest {
     constructor(options) {
         const o = options || {};
+        this.m_iGetUserSession = 0;
         this.m_sFolder = o.folder || null;
         this.m_sId = o.id || "id" + ++CRequest.s_iIdNext;
         this.m_callProcess = [];
@@ -89,7 +90,9 @@ export class CRequest {
         const sOpen = sData ? "POST" : "GET";
         oParameters = oParameters || {};
         sUrl = sUrl || this.m_sUrl;
-        oParameters = Object.assign({}, { user: this.m_sSession, folder: this.m_sFolder, file: this.m_sFile }, oParameters);
+        oParameters = Object.assign({}, { folder: this.m_sFolder, file: this.m_sFile }, oParameters);
+        if (this.m_sSession)
+            oParameters.user = this.m_sSession;
         sUrl += CRequest.GetParameter(oParameters); // parameters first
         sUrl += this.GetMethod(sMethod); // methods last, methods need parameters so there fore params need to be first in querystring
         var XHRequest = new XMLHttpRequest();
@@ -164,12 +167,33 @@ export class CRequest {
                 let sMethod = eSection.getAttribute("name"); // method name for section
                 if (sMethod === "s03") {
                     if (sError === "1" && !this.session) {
+                        this.m_iGetUserSession++;
                         this.session = null;
-                        this.m_callProcess[0].call(this, null, "user");
-                        return;
+                        if (this.m_iGetUserSession < 2) {
+                            this.m_callProcess[0].call(this, null, "user");
+                            return;
+                        }
                     }
                     else {
-                        this.session = eSection.querySelector("user").getAttribute("user");
+                        const eUser = eSection.querySelector("user");
+                        sError = eUser.getAttribute("error");
+                        if (sError !== "1") {
+                            this.m_iGetUserSession = 0;
+                            this.session = eUser.getAttribute("user");
+                            const sAlias = eUser.getAttribute("alias");
+                            if (sAlias) {
+                                this.m_callProcess[0].call(this, null, "alias", { sMethod: "alias", sResponseText: sAlias });
+                            }
+                        }
+                        else if (this.m_iGetUserSession === 0) {
+                            // try to get user session again, just once
+                            this.m_iGetUserSession++;
+                            this.session = null;
+                            if (this.m_iGetUserSession < 2) {
+                                this.m_callProcess[0].call(this, null, "user");
+                                return;
+                            }
+                        }
                     }
                 }
                 oEvent.sMethod = sMethod; // server method name

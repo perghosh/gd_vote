@@ -20,6 +20,7 @@ export declare type EventRequest = {
     iStatus?: number;
 };
 export declare class CRequest {
+    m_iGetUserSession: number;
     m_sFile: string;
     m_sFolder: string;
     m_sId: string;

@@ -15,9 +15,9 @@ export class CApplication {
             //url: "http://goorep.se:1001/changelog/jq.srf?"
             //url: "http://localhost:8080/so/jq.srf?"
         });
-        this.m_sAlias = "guest"; // change this based on what alias that is used
+        this.m_sAlias = o.alias || "guest"; // change this based on what alias that is used
         //this.m_sAlias = "per";
-        this.m_sQueriesSet = "vote";
+        this.m_sQueriesSet = "";
         if (o.session) {
             this.m_oRequest.session = o.session;
         }
@@ -73,7 +73,7 @@ export class CApplication {
             return null;
         };
         let oApplication = window.app;
-        var sError = eSection.getAttribute("error");
+        var sError = eSection ? eSection.getAttribute("error") : "";
         if (sError === "1") {
             let sError = eSection.textContent;
             throw sError;
@@ -86,14 +86,21 @@ export class CApplication {
         }
         else if (sMethod === "SYSTEM_GetUserData") {
             oApplication.CallOwner("server-session");
+            oApplication.queries_set = oApplication.page.queries_set;
             if (oApplication.queries_set) {
                 let request = oApplication.request;
                 let oCommand = { command: "load_if_not_found", set: "vote" };
                 request.Get("SCRIPT_Run", { file: "queriesset.lua", json: request.GetJson(oCommand) });
             }
             else {
-                // oApplication.InitializePage();
+                oApplication.page.CallOwner("load");
             }
+        }
+        else if (sMethod === "user") {
+            oApplication.request.Get("SYSTEM_GetUserData", { name: "guest" });
+        }
+        else if (sMethod === "alias") {
+            oApplication.m_sAlias = e.sResponseText;
         }
     }
 } // class CApplication

@@ -1,5 +1,8 @@
 /*
 
+dynamic imports
+https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import#dynamic_imports
+
 pageone = page logic for managing one vote, user can not select any votes. active vote is sent as parameter
 
 # Navigate
@@ -224,6 +227,9 @@ export class CPageOne extends CPageSuper {
             this.m_oD3Bar.Render(this.m_bFilterConditionCount);
         }
     }
+    /**
+     * Close markup elements in page that is related to state and  selected poll questions
+     */
     CloseQuestions() {
         document.getElementById("idPollVote").innerHTML = "";
         document.getElementById("idPollFilterCount").innerHTML = "";
@@ -486,11 +492,11 @@ export class CPageOne extends CPageSuper {
         if (this.IsVoter() === false && iIpCount > 0) {
             this.poll.count = iIpCount;
         }
-        this.poll.count = 0; // TODO: remove this when voter should be blocked to vote more than once
         if (iQuestionCount > 0) {
             // ## Generate title for poll
             let eTitle = eRoot.querySelector("[data-title]");
             eTitle.textContent = sName;
+            document.getElementById("idPollTitle").textContent = sName;
             let eDescription = eRoot.querySelector("[data-description]");
             if (eDescription)
                 eDescription.textContent = sDescription || "";
@@ -969,9 +975,9 @@ export class CPageOne extends CPageSuper {
                 this.m_aVoteHistory = JSON.parse(s);
         }
     }
-    static HISTORYSerializeSession(bSave, sSession) {
+    static HISTORYSerializeSession(bSave, sSession, sAlias) {
         if (bSave === true) {
-            const oSession = { time: (new Date()).toISOString(), session: sSession };
+            const oSession = { time: (new Date()).toISOString(), session: sSession, alias: sAlias };
             localStorage.setItem("session", JSON.stringify(oSession));
         }
         else {
@@ -980,8 +986,8 @@ export class CPageOne extends CPageSuper {
                 const oSession = JSON.parse(sSession);
                 // Compare date, if older than one hour then skip
                 const iDifference = (new Date()) - Date.parse(oSession.time);
-                if (iDifference < 3600000) {
-                    return oSession.session;
+                if (iDifference < 10000000) {
+                    return [oSession.session, oSession.alias];
                 }
             }
         }

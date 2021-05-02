@@ -14,9 +14,8 @@
 
 
    <div class="container" style="border:  3px solid #3aaa35; border-radius:  1em; padding: 1em;">
-      <div style="position: absolute; top: 1em; right: 1em; opacity: 0.2; max-width: 150px;">
+      <div style="position: absolute; top: 1em; right: 1em; opacity: 0.1; max-width: 150px;">
          <img src="res/icon_medium.jpg" alt="logo">
-         
       </div>
 
       <div id="idUserMessage" data-section="information">
@@ -54,19 +53,31 @@ div[data-section="container"]
          <div data-section="tab" class="tabs is-medium">
             <ul>
                <li class="is-active" data-index="1"><a data-translate="page.vote.Vote">Rösta</a></li>
-               <li data-index="2"><a data-translate="page.vote.Result">Resultat</a></li>
-               <li data-index="3"><a data-translate="page.vote.Search">Sök</a></li>
+               <li data-index="2"><a data-translate="page.vote.Result">Filtrera röster</a></li>
+               <li data-index="3"><a data-translate="page.vote.Search">Välj omröstning</a></li>
             </ul>
          </div>
+
+         <div id="idContent" class="box" data-section="content">
+            <!-- Vote section, here voter are able to vote, query = poll_question_list / poll_answer -->
+            <div id="idPollTitle" class="is-size-3 has-text-weight-bold" style="color: #3aaa35; text-align: right; margin-bottom: 1em; margin-right: 1em;"></div>
+            <article id="idPollVote" class="is-active" data-index="1" data-state="body.vote">
+            </article>
+
+            <!-- Vote count is where votes for each answer is shown and buttons used to filter votes, query = poll_question_list / poll_answer_count -->
+            <article id="idPollFilterCount" data-index="2" data-state="body.count">
+            </article>
+
+            <!-- Search for poll, this section presents search result, query = "poll_search"  -->
+            <article id="idPollSearch" data-index="3" data-state="body.search" data-one="0">
+            </article>
+         </div>
+
 
          <!-- Header for poll, here the poll name and description is shown  -->
          <div id="idPollOverview" class="box has-background-success-light">
             <h1 class="title is-2" data-title></h1>
             <p data-description></p>
-            <article class="panel has-background-white" data-section="link" style="display: none; margin-top: 1em; padding: 5px;">
-               <p class="panel-heading" data-translate="page.vote.TitleLinks">Länkar</p>
-            </article>               
-
 
             <!-- Present poll result as bar chart, one for each question-->
             <article class="panel" data-section="d3bars" style="width:  100%; margin-top: 1em; padding: 5px;">
@@ -81,29 +92,19 @@ div[data-section="container"]
                <article class="has-background-white" data-view="none" data-section="result_vote_count" style="display: none; margin-top: 1em; padding: 5px;">
                </article>
             </div>
+            <article class="panel has-background-white" data-section="link" style="display: none; margin-top: 1em; padding: 5px;">
+               <p class="panel-heading" data-translate="page.vote.TitleLinks">Länkar</p>
+            </article>               
          </div>
 
-         <div id="idContent" data-section="content">
-            <!-- Vote section, here voter are able to vote, query = poll_question_list / poll_answer -->
-            <article id="idPollVote" class="box is-active" data-index="1" data-state="body.vote">
-            </article>
-
-            <!-- Vote count is where votes for each answer is shown and buttons used to filter votes, query = poll_question_list / poll_answer_count -->
-            <article id="idPollFilterCount" class="box" data-index="2" data-state="body.count">
-            </article>
-
-            <!-- Search for poll, this section presents search result, query = "poll_search"  -->
-            <article id="idPollSearch" class="box" data-index="3" data-state="body.search" data-one="0">
-            </article>
-         </div>
       </div>
    </div>
 
 
    <script>
       function PAGE_Setup() {
-         const sSession = CPageOne.HISTORYSerializeSession( false );
-         window.app = new CApplication({ callback_action: PAGE_Callback, session: sSession });
+         const [sSession,sAlias] = CPageOne.HISTORYSerializeSession( false );
+         window.app = new CApplication({ callback_action: PAGE_Callback, session: sSession, alias: sAlias });
          window.app.Initialize();
       }
 
@@ -140,9 +141,11 @@ div[data-section="container"]
          }
          else if(sOperation === "server-session") {
             if( !this.page) {
-               this.m_oPage = new CPageOne(this, {callback_action: PAGE_Callback, read_url: true, set: "vote"});
+               const sQuerySet = "vote";
+               this.m_oPage = new CPageOne(this, {callback_action: PAGE_Callback, read_url: true, set: sQuerySet});
                const sSession = window.app.request.session;
-               CPageOne.HISTORYSerializeSession( true, sSession );
+               const sAlias = window.app.alias;
+               CPageOne.HISTORYSerializeSession( true, sSession, sAlias );
 
                //this.m_oPage.SetActivePoll( 26 );
             }

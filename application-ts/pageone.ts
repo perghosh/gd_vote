@@ -289,6 +289,9 @@ export class CPageOne extends CPageSuper {
    }
 
 
+   /**
+    * Close markup elements in page that is related to state and  selected poll questions
+    */
    CloseQuestions() {
       document.getElementById("idPollVote").innerHTML = "";
       document.getElementById("idPollFilterCount").innerHTML = "";
@@ -577,14 +580,11 @@ export class CPageOne extends CPageSuper {
          this.poll.count = iIpCount;
       }
 
-
-      this.poll.count = 0; // TODO: remove this when voter should be blocked to vote more than once
-
-
       if(iQuestionCount > 0) {
          // ## Generate title for poll
          let eTitle = <HTMLElement>eRoot.querySelector("[data-title]");
          eTitle.textContent = sName;
+         document.getElementById("idPollTitle").textContent = sName;
          let eDescription = <HTMLElement>eRoot.querySelector("[data-description]");
          if(eDescription) eDescription.textContent = sDescription || "";
          let eCount = eRoot.querySelector("[data-count]");
@@ -1150,19 +1150,19 @@ export class CPageOne extends CPageSuper {
       }
    }
 
-   static HISTORYSerializeSession( bSave: boolean, sSession: string ): string |null {
+   static HISTORYSerializeSession( bSave: boolean, sSession: string, sAlias?: string ): [string,string] |null {
       if( bSave === true ) {
-         const oSession = { time: (new Date()).toISOString(), session: sSession };
+         const oSession = { time: (new Date()).toISOString(), session: sSession, alias: sAlias };
          localStorage.setItem( "session", JSON.stringify( oSession ) );
       }
       else {
          const sSession = localStorage.getItem("session");
          if( sSession ) {
-            const oSession: { time: string, session: string } = JSON.parse( sSession );
+            const oSession: { time: string, session: string, alias: string } = JSON.parse( sSession );
             // Compare date, if older than one hour then skip
             const iDifference: any = <any>(new Date()) - Date.parse(oSession.time);
-            if( iDifference <  3600000 ) {
-               return oSession.session;
+            if( iDifference <  10000000 ) {
+               return [oSession.session,oSession.alias];
             }
          }
       }
