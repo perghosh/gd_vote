@@ -1229,12 +1229,15 @@ export class CUITableText {
         }
         let eSpan = eRow.firstElementChild;
         const iCount = aHeader.length;
+        let EVT = this._get_triggerdata();
         for (let i = 0; i < iCount; i++) {
             const aName = aHeader[i][1];
             if (bCall) {
                 let bRender = true;
+                EVT.information = aName;
+                EVT.eElement = eSpan;
                 for (let j = 0; j < this.m_acallRender.length; j++) {
-                    let b = this.m_acallRender[j].call(this, "beforeHeaderValue", aName, eSpan, this.data.COLUMNGet(this._column_in_data(i), undefined, true));
+                    let b = this.m_acallRender[j].call(this, "beforeHeaderValue", EVT, "header", this.data.COLUMNGet(this._column_in_data(i), undefined, true));
                     if (b === false)
                         bRender = false;
                 }
@@ -1246,7 +1249,7 @@ export class CUITableText {
                 eSpan.title = eSpan.innerText;
                 eSpan.dataset.c = aHeader[i][0].toString(); // set column index
                 if (bCall)
-                    this.m_acallRender.forEach((call) => { call.call(this, "afterHeaderValue", aName, eSpan, this.data.COLUMNGet(this._column_in_data(i), undefined, true)); });
+                    this.m_acallRender.forEach((call) => { call.call(this, "afterHeaderValue", EVT, "header", this.data.COLUMNGet(this._column_in_data(i), undefined, true)); });
                 eSpan = eSpan.nextElementSibling;
             }
         }
@@ -1992,6 +1995,7 @@ export class CUITableText {
     _action(sType, e, sSection) {
         if (this.m_acallAction && this.m_acallAction.length > 0) {
             let EVT = this._get_triggerdata();
+            EVT.eEvent = e;
             let i = 0, iTo = this.m_acallAction.length;
             let callback = this.m_acallAction[i];
             while (i++ < iTo) {
@@ -2009,10 +2013,12 @@ export class CUITableText {
      */
     _on_action(sType, e, sSection) {
         if (this.m_acallAction && this.m_acallAction.length > 0) {
+            let EVT = this._get_triggerdata();
+            EVT.eEvent = e;
             let i = 0, iTo = this.m_acallAction.length;
             let callback = this.m_acallAction[i];
             while (i++ < iTo) {
-                let bResult = callback.call(this, sType, e, sSection);
+                let bResult = callback.call(this, sType, EVT, sSection);
                 if (bResult === false)
                     return;
             }

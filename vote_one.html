@@ -150,6 +150,12 @@ div[data-section="container"]
                //this.m_oPage.SetActivePoll( 26 );
             }
          }
+         else if(sOperation === "select-poll") {
+            // set arrow to down for open vote counts for questions
+            let e = document.getElementById("idResultVoteCount");
+            e.querySelector("i").className = "fas fa-chevron-down";
+            e.querySelector("article").dataset.view = "none";
+         }
          else if(sOperation === "table") {
             if( data.name === "poll_search" ) {
                let e = data.tt.GetSection("body");

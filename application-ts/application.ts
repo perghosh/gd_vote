@@ -37,7 +37,7 @@ export class CApplication {
 
       this.m_sAlias = o.alias || "guest";                                       // change this based on what alias that is used
       //this.m_sAlias = "per";
-      this.m_sQueriesSet = "";
+      this.m_sQueriesSet = "vote";
       if(o.session) {
          this.m_oRequest.session = o.session;
       }

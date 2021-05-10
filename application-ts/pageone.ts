@@ -17,7 +17,7 @@ pageone = page logic for managing one vote, user can not select any votes. activ
 | QUERYGetPollList | Get active polls. query = poll_list |
 | QUERYGetPollOverview | Get information about selected poll. query = poll_overview. query = `poll_overview` |
 | QUERYGetPollLinks | Get links for poll. Query used is `poll_links` |
-| QUERYGetPollFilterCount | Get poll result (votes are counted) |
+| QUERYGetPollFilterCount | Get poll result (votes are counted), conditions for filter result is also added here |
 | RESULTCreateFindVoter | Result from finding voter, this is called if user tries to login |
 | RESULTCreatePollOverview | Process result from  `poll_overview`|
 | RESULTCreatePollOverviewLinks | Process result from `poll_links` and render these for user |
@@ -26,6 +26,7 @@ pageone = page logic for managing one vote, user can not select any votes. activ
 | RESULTCreateVote | Create vote for poll question. Creates markup for possible answers to poll question |
 | RESULTCreateVoteCountAndFilter | Create markup showing vote count with filter logic on each answer for poll question |
 | RESULTCreateSearch | Create search table used to select active poll, toolbar with navigation is also created here |
+| RESULTCreatePollHashtags |  |
 | CONDITIONMarkFilterVote |  Mark items that has been filtered |
 | WalkNextState | Walks queries used to collect information for active state |
 | PAGECreateToolbarForSearch | Walks queries used to collect information for active state |
@@ -66,6 +67,7 @@ namespace details {
 export class CPageOne extends CPageSuper {
    m_oD3Bar: CD3Bar;                // manage d3 bar for vote result
    m_bFilterConditionCount: boolean; // there are filter conditions
+   m_oLabel: { [ label_id: string ]: string }; // labels in page
    m_sQueriesSet: string;            // active query set
    m_aPageState: CPageState[];
    m_oPageState: CPageState;        // current page state that is being processed
@@ -116,6 +118,12 @@ export class CPageOne extends CPageSuper {
       this.m_aVoter = [ -1, "", "" ];         // no voter (-1)
       this.m_aVoteHistory = [];
       this.HISTORYSerialize(false);
+
+
+      this.m_oLabel = {
+         "add_filter": "Visa röster för",
+         "remove_filter": "Ta bort visning för"
+      };
    }
 
    get app() { return this.m_oApplication; }                                   // get application object
@@ -138,6 +146,9 @@ export class CPageOne extends CPageSuper {
 
    GetActivePoll() { return this.poll.poll; }
 
+   // Get labels (text) in page
+   GetLabel( sId: string ) { return this.m_oLabel[sId]; }
+
    /**
     * Activate poll with number
     * @param iActivePoll key to active poll  
@@ -148,6 +159,7 @@ export class CPageOne extends CPageSuper {
       if( this.m_oD3Bar ) this.m_oD3Bar.DeleteQuestion();
 
       if( iActivePoll !== this.GetActivePoll() ) {
+         this.CallOwner("select-poll");
          (<HTMLElement>document.getElementById( "idPollOverview" ).querySelector('[data-section="result_vote_count"]')).style.display = "none";
       }
 
@@ -418,6 +430,9 @@ export class CPageOne extends CPageSuper {
             else if(sQueryName === "poll_search") {
                this.RESULTCreateSearch("idPollSearch", oResult);
             }
+            else if(sQueryName === "poll_hashtags") {
+               this.RESULTCreatePollHashtags(oResult);
+            }
          }  break;
          //case "load":
          case "load_if_not_found":
@@ -497,6 +512,7 @@ export class CPageOne extends CPageSuper {
    QUERYGetPollFilterCount(iPoll: number);
    QUERYGetPollFilterCount( oAnswer: { answer: number } );
    QUERYGetPollFilterCount( oAnswer: { condition: string } );
+   //QUERYGetPollFilterCount( oOrder: { index: number } );
    QUERYGetPollFilterCount( _1: any) {
       let request = this.app.request;
       const sQuery = "poll_answer_filtercount";
@@ -504,7 +520,7 @@ export class CPageOne extends CPageSuper {
       let aCondition: any[];
       let oCommand: {[k:string]: string|number} = { command: "add_condition_to_query get_result", query: sQuery, set: this.queries_set, count: 100, format: 1, start: 0 };
 
-      if( typeof _1 === "number" ) { 
+      if( typeof _1 === "number" ) { // if number that means that a new poll is selected, delete all conditions
          aCondition = [ { table: "TPoll1", id: "PollK", value: _1 } ];
          oCommand.delete = 1;
       }
@@ -525,7 +541,7 @@ export class CPageOne extends CPageSuper {
       request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", hint: sQuery, json: request.GetJson(oCommand) }, sXml);
    }
 
-   QUERYGetSearch( oCondition: { snapshot?: string, start?: number } ) {
+   QUERYGetSearch( oCondition: { snapshot?: string, start?: number, index?: number } ) {
       const iStart = oCondition.start || 0;
       let request = this.app.request;
       let sCommand: string = "";
@@ -535,12 +551,34 @@ export class CPageOne extends CPageSuper {
          oCommand.name = oCondition.snapshot;
          sCommand += " set_snapshot";
       }
+      if( typeof oCondition.index === "number" ) {
+         sCommand += " set_order";
+         oCommand.index = oCondition.index;
+         this.m_oUITableText.poll_search = null;            // full render
+      }
       sCommand += " get_result";
       oCommand.command = sCommand;
       request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", hint: "poll_search", json: request.GetJson(oCommand) });
    }
 
 
+   /**
+    * Get hashtags to filter votes
+    */
+   QUERYGetHashtags( iPoll?: number ) {
+      let request = this.app.request;
+      let sXml;
+
+      if(iPoll) {
+         let oQuery = new CQuery({
+            conditions: [{ table: "TPoll1", id: "PollK", value: iPoll }]
+         });
+         sXml = <string>oQuery.CONDITIONGetXml();
+      }
+
+      let oCommand = { command: "add_condition_to_query get_result", delete: 1, query: "poll_hashtags", set: this.queries_set, count: 50, format: 1, start: 0 };
+      request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
+   }
 
 
    /**
@@ -891,8 +929,13 @@ export class CPageOne extends CPageSuper {
             let eSection = <HTMLElement>document.createElement("section");
             eSection.dataset.question = iQuestion.toString();
             eSection.className = "block";
-            eSection.style.margin = "1em";
-            eSection.innerHTML = `<header class="title is-3">${iPollIndex}: ${sName}</header><article style="display: block;"></article>`;
+            eSection.style.margin = "0em 1em";
+            if( this.view_mode === "vote" ) {
+               eSection.innerHTML = `<header class="title is-3">${iPollIndex}: ${sName}</header><article style="display: block;"></article>`;
+            }
+            else {
+               eSection.innerHTML = `<header class="title is-5" style="margin-bottom: 0.5em;">${iPollIndex}: ${sName}</header><article style="display: block;"></article>`;
+            }
             eQuestion.appendChild(eSection);
          }
 
@@ -966,7 +1009,7 @@ export class CPageOne extends CPageSuper {
 
       let options = {
          parent: eArticle,                         // container
-         section: [ "title", "table.header", "table.body", "footer" ],// sections to create
+         section: [ "title", "table.body", "footer" ],// sections to create
          table: oTD,                               // source data
          name: "vote",                             // name to access UI table in CTableData
          style: oStyle,                            // styling
@@ -975,9 +1018,10 @@ export class CPageOne extends CPageSuper {
 
       let oTT = new CUITableText(options);
       oTD.UIAppend(oTT);
+      const sFilter = this.GetLabel("add_filter");
 
       oTT.COLUMNSetRenderer(0, (e, v, a) => {
-         e.innerHTML = `<button class="button is-primary is-light is-small" data-answer="${v}">Ta bort</button>`;
+         e.innerHTML = `<button class="button is-primary is-light is-small" data-answer="${v}">${sFilter}</button>`;
       });
 
       oTT.Render();
@@ -988,7 +1032,7 @@ export class CPageOne extends CPageSuper {
             if( typeof eButton.dataset.uuid === "string" ) {
                this.QUERYGetPollFilterCount({ condition: eButton.dataset.uuid });
                eButton.className = "button is-primary is-light is-small";
-               eButton.innerText = "Ta bort";
+               eButton.innerText = this.GetLabel("add_filter");
                delete eButton.dataset.uuid;
             }
             else {
@@ -1007,6 +1051,7 @@ export class CPageOne extends CPageSuper {
    RESULTCreateSearch( eRoot: string|HTMLElement, oResult: any ) {
       if(typeof eRoot === "string") eRoot = document.getElementById(eRoot);
 
+      let self = this;
       let oTT = this.m_oUITableText.poll_search;
       let oTD: CTableData = oTT ? oTT.data : null;
 
@@ -1092,8 +1137,34 @@ export class CPageOne extends CPageSuper {
          style: oStyle,                            // styling
          table: oTD,                               // source data
          trigger: oTrigger,                        // set trigger object, this will enable triggers for the search table
+         callback_action: function(sType: string, e: EventDataTable, sSection: string) {
+            if(sType === "click" && sSection === "header") {
+               let eElement = e.eElement || e.eEvent.srcElement;
+               const aColumn = this.COLUMNGet(eElement);
+               if( aColumn ) {
+                  const oColumn = aColumn[1]; // get column object for table data
+                  let iIndex = aColumn[0] + 1; // one based index when sort is set
+                  let iSort = oColumn.state?.sorted;
+                  if( iSort === 1 ) iIndex = -iIndex;
+
+                  self.QUERYGetSearch({ index: iIndex });
+               }
+            }
+         },
          callback_render: function( sType: string, e: EventDataTable, sSection: string, oColumn: any ) {
-            if( sType === "beforeInput" ) {
+            if( sType === "afterHeaderValue" ) {
+               e.eElement.style.cursor = "pointer";         // change cursor
+               let iSort = oColumn.state?.sorted;
+               if( iSort ) {
+                  let eI = document.createElement("i");
+                  eI.style.paddingLeft = ".3em";
+                  if( iSort === 1 ) eI.className = "fas fa-sort-up";
+                  else eI.className = "fas fa-sort-down";
+                  e.eElement.appendChild(eI);
+                  e.eElement.style.whiteSpace = "nowrap";
+               }
+            }
+            else if( sType === "beforeInput" ) {
                let eTR = e.eElement.closest("tr");
                let eTable = eTR.closest("table");
 
@@ -1126,6 +1197,64 @@ export class CPageOne extends CPageSuper {
       this.CallOwner("table", { name: "poll_search", tt: oTT, td: oTD});
    }
 
+
+   /**
+    * Create hastag tags to filter from
+    * @param {any} oResult Hasstag to filter from
+    */
+   RESULTCreatePollHashtags(oResult: any) {
+      let oTT = this.m_oUITableText.poll_search;
+      let eToolbar = oTT.GetSection("toolbar");
+      let eRoot = <HTMLElement>eToolbar.querySelector('[data-container="hashtag"]');
+      eRoot.innerHTML = "";
+      eRoot.style.display = "block";
+      let oTD = new CTableData({ id: oResult.id, name: oResult.name });
+      const aHeader = oResult.table.header;
+      CPageSuper.ReadColumnInformationFromHeader(oTD, aHeader, (iIndex, oColumn, oTD) => {
+         /*
+         if(oColumn.key) {
+            oTD.COLUMNSetPropertyValue(iIndex, "position.hide", true);
+         }
+         */
+      });
+
+      oTD.ReadArray(oResult.table.body, { begin: 0 });
+      oTD.COLUMNSetPropertyValue(["BadgeK"], "position.hide", true);
+      oTD.COLUMNSetPropertyValue("FName", "style.cssText", "margin: 2px; cursor: pointer;");
+
+      const oStyle = {
+         html_row: "span",                                  // "div" for rows and "row" class
+         html_cell: "span.button is-primary is-outlined",   // "span" for cells
+      }
+
+      const options = {
+         //dispatch: oDispatch,
+         parent: eRoot,                                     // container
+         section: ["body"],                                 // sections to create, only one body section
+         table: oTD,                                        // source data
+         style: oStyle,                                     // styling
+         callback_action: (sType: string, e: EventDataTable, sSection: string): boolean => {
+            if(sType === "click") {
+               let eRow = <HTMLElement>e.eEvent.srcElement;
+               if( eRow.tagName === "SPAN") {
+                  if( eRow.dataset.type !== "row" ) eRow = eRow.parentElement;
+
+                  const iRow = parseInt( eRow.dataset.line, 10 );
+
+                  const iKey = <number>oTD.CELLGetValue( iRow, "BadgeK");
+                  const sName = <string>oTD.CELLGetValue( iRow, "FName");
+                 //this.QUERYGetPollList( [[iKey, sName]] );
+               }
+            }
+
+            return true;
+         }
+      };
+
+      oTT = new CUITableText(options);                      // create CUITableText that render table in browser
+      oTD.UIAppend(oTT);                                    // add ui object to source data object (CTableData)
+      oTT.Render();                                         // render table
+   }
 
 
    /**
@@ -1166,7 +1295,7 @@ export class CPageOne extends CPageSuper {
             }
          }
       }
-      return null;
+      return [null,null];
    }
 
    /**
@@ -1185,7 +1314,7 @@ export class CPageOne extends CPageSuper {
             // find button with filter
             let eButton = this.ELEMENTGetFilterButton( parseInt( <string>oTD.CELLGetValue( i, "value" ), 10 ) );
             eButton.className = "button is-warning is-light is-small";
-            eButton.innerText = "Lägg till";
+            eButton.innerText = this.GetLabel("remove_filter");
             eButton.dataset.uuid = <string>oTD.CELLGetValue( i, "uuid" );
          }
       }
@@ -1226,7 +1355,17 @@ export class CPageOne extends CPageSuper {
    PAGECreateToolbarForSearch( oResult: any ) {
       let oTT = this.m_oUITableText.poll_search;
       let eToolbar = oTT.GetSection("toolbar");
-      eToolbar.style.display = "flex";
+
+      let eDiv = document.createElement("div");
+      eDiv.dataset.container = "hashtag";
+      eDiv.className = "box";
+      eDiv.style.display = "none";
+      eToolbar.appendChild( eDiv );
+      let eToolbarCommand = document.createElement("div");
+      eToolbarCommand.dataset.container = "command";
+      eToolbar.appendChild( eToolbarCommand );
+
+      eToolbarCommand.style.display = "flex";
 
 
       //
@@ -1252,15 +1391,28 @@ export class CPageOne extends CPageSuper {
          }
          */
         
-        let eDiv = document.createElement("div");
-        eDiv.className = "select is-primary";
-        eDiv.appendChild( eSelect );
-        eToolbar.appendChild( eDiv );
+         let eDiv = document.createElement("div");
+         eDiv.className = "select is-primary";
+         eDiv.appendChild( eSelect );
+         eToolbarCommand.appendChild( eDiv );
 
-        eSelect.addEventListener( "change", e => {
-           const sSnapshot = (<HTMLSelectElement>e.srcElement).value;
-           this.QUERYGetSearch({ snapshot: sSnapshot });
-        });
+         eSelect.addEventListener( "change", e => {
+            const sSnapshot = (<HTMLSelectElement>e.srcElement).value;
+            this.QUERYGetSearch({ snapshot: sSnapshot });
+         });
+      }
+
+      //
+      // ## Hashtag filter
+      //
+      {
+         let eButton = document.createElement("button");
+         eButton.className = "button is-primary is-outlined ml-1";
+         eButton.innerText = "#";
+         eToolbarCommand.appendChild( eButton );
+         eButton.addEventListener( "click", e => {
+            this.QUERYGetHashtags();
+         });
       }
 
       //
@@ -1268,14 +1420,13 @@ export class CPageOne extends CPageSuper {
       //
       {
          let oDispatch = this.m_oUITableText.poll_search.dispatch;
-         let oTT = this.m_oUITableText.poll_search;
          let oTD: CTableData = oTT ? oTT.data : null;
 
          let eContainer = document.createElement("div");
          eContainer.style.display = "inline-block";
          eContainer.style.marginLeft = "auto";
 
-         eToolbar.appendChild(eContainer);   // add container to toolbar
+         eToolbarCommand.appendChild(eContainer);   // add container to toolbar
 
          let oPager = new CUIPagerPreviousNext({
             dispatch: oDispatch, // dispatcher used to communicate with ui table

@@ -1061,6 +1061,11 @@ export class CTableData {
                     if (s === "number")
                         oColumn.style.textAlign = "right";
                 }
+                else if (v === null) {
+                    oColumn.type.group = "string";
+                    oColumn.type.type = 262160 /* str */;
+                    oColumn.style.textAlign = "right";
+                }
                 else {
                     let eType = v.type || 0 /* unknown */;
                     if (eType === 0 /* unknown */) {

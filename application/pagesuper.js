@@ -53,6 +53,9 @@ export class CPageSuper {
             oTD.COLUMNSetPropertyValue(i, "name", o.name);
             oTD.COLUMNSetPropertyValue(i, "alias", o.simple);
             oTD.COLUMNSetType(i, o.select_type_name);
+            if (typeof o.order === "number" && o.order !== 0) {
+                oTD.COLUMNSetPropertyValue(i, "state.sorted", o.order);
+            }
             if (callback)
                 callback(i, o, oTD);
         }
