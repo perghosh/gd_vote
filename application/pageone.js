@@ -14,8 +14,7 @@ pageone = page logic for managing one vote, user can not select any votes. activ
 | **SetActivePoll** | Calling this method triggers a chain of operations that will display needed information about active poll |
 | OpenMessage | Show message to user |
 | **ProcessResponse** | Process responses from server |
-| QUERYGetPollList | Get active polls. query = poll_list |
-| QUERYGetPollOverview | Get information about selected poll. query = poll_overview. query = `poll_overview` |
+| QUERYGetPollOverview | Get information about selected poll. query = poll_overview. |
 | QUERYGetPollLinks | Get links for poll. Query used is `poll_links` |
 | QUERYGetPollFilterCount | Get poll result (votes are counted), conditions for filter result is also added here |
 | RESULTCreateFindVoter | Result from finding voter, this is called if user tries to login |
@@ -25,7 +24,7 @@ pageone = page logic for managing one vote, user can not select any votes. activ
 | RESULTCreateQuestionPanel | Create panels for each question that belongs to current selected poll. Like containers for selectable votes |
 | RESULTCreateVote | Create vote for poll question. Creates markup for possible answers to poll question |
 | RESULTCreateVoteCountAndFilter | Create markup showing vote count with filter logic on each answer for poll question |
-| RESULTCreateSearch | Create search table used to select active poll, toolbar with navigation is also created here |
+| RESULTCreateSearch | Create search table used to select active poll, tool-bar with navigation is also created here |
 | RESULTCreatePollHashtags |  |
 | CONDITIONMarkFilterVote |  Mark items that has been filtered |
 | WalkNextState | Walks queries used to collect information for active state |
@@ -42,7 +41,7 @@ import { CUIPagerPreviousNext } from "./../library/UIPagerPreviousNext.js";
 import { CDispatch } from "./../library/Dispatch.js";
 import { CUITableText } from "./../library/UITableText.js";
 import { CQuery } from "./../server/Query.js";
-import { CPageSuper, CPageState } from "./pagesuper.js";
+import { CPageSuper, CQuestion, CPageState } from "./pagesuper.js";
 import { CD3Bar } from "./pageone_d3.js";
 export class CPageOne extends CPageSuper {
     constructor(oApplication, oOptions) {
@@ -72,7 +71,9 @@ export class CPageOne extends CPageSuper {
         this.HISTORYSerialize(false);
         this.m_oLabel = {
             "add_filter": "Visa röster för",
-            "remove_filter": "Ta bort visning för"
+            "remove_filter": "Ta bort visning för",
+            "vote": "RÖSTA",
+            "vote_exist": "Röst är registrerad för aktuell fråga."
         };
     }
     get app() { return this.m_oApplication; } // get application object
@@ -93,6 +94,20 @@ export class CPageOne extends CPageSuper {
     GetActivePoll() { return this.poll.poll; }
     // Get labels (text) in page
     GetLabel(sId) { return this.m_oLabel[sId]; }
+    /**
+     * Get Question object for question key, question object has rules/limits for what is possible to vote on for user
+     * @param {number} iQuestion key to question
+     * @returns {CQuestion}
+     */
+    GetQuestion(iQuestion) {
+        for (let i = 0; i < this.m_aQuestion.length; i++) {
+            const o = this.m_aQuestion[i];
+            if (o.key === iQuestion)
+                return o;
+        }
+        console.assert(false, `No Question for ${iQuestion}`);
+        return null;
+    }
     /**
      * Activate poll with number
      * @param iActivePoll key to active poll
@@ -239,6 +254,7 @@ export class CPageOne extends CPageSuper {
      * Close markup elements in page that is related to state and  selected poll questions
      */
     CloseQuestions() {
+        this.m_aQuestion = [];
         document.getElementById("idPollVote").innerHTML = "";
         document.getElementById("idPollFilterCount").innerHTML = "";
         this.OpenMessage(); // close any open message
@@ -512,8 +528,9 @@ export class CPageOne extends CPageSuper {
         CPageSuper.ReadColumnInformationFromHeader(oTD, oResult.table.header);
         oTD.ReadArray(oResult.table.body, { begin: 0 });
         const sName = oTD.CELLGetValue(0, 1); // Poll name
-        const sDescription = oTD.CELLGetValue(0, 2); // Poll description
-        const iQuestionCount = oTD.CELLGetValue(0, 3); // Number of questions in poll
+        const sDescription = oTD.CELLGetValue(0, "Description"); // Poll description
+        const sArticle = oTD.CELLGetValue(0, "Article"); // Poll article
+        const iQuestionCount = oTD.CELLGetValue(0, "CountQuestion"); // Number of questions in poll
         const iLinkCount = oTD.CELLGetValue(0, "CountLink"); // Links associated with poll
         const iVoteCount = oTD.CELLGetValue(0, "MyCount"); // if registered voter has voted in this poll
         const iIpCount = oTD.CELLGetValue(0, "IpCount"); // if count number of votes for ip number
@@ -530,8 +547,23 @@ export class CPageOne extends CPageSuper {
             eTitle.textContent = sName;
             document.getElementById("idPollTitle").textContent = sName;
             let eDescription = eRoot.querySelector("[data-description]");
-            if (eDescription)
+            if (eDescription) {
+                eDescription.style.display = "block";
                 eDescription.textContent = sDescription || "";
+            }
+            const eArticle = eRoot.querySelector("[data-article]");
+            if (eArticle) {
+                if (sArticle) {
+                    eArticle.style.display = "block";
+                    eArticle.innerHTML = marked(sArticle);
+                    if (eDescription)
+                        eDescription.style.display = "none";
+                }
+                else {
+                    eArticle.style.display = "none";
+                    eArticle.innerHTML = "";
+                }
+            }
             let eCount = eRoot.querySelector("[data-count]");
             if (eCount)
                 eCount.textContent = iQuestionCount.toString();
@@ -563,7 +595,9 @@ export class CPageOne extends CPageSuper {
             }
         });
         TDVote.ReadArray(oResult.table.body, { begin: 0 });
-        let iQuestion = TDVote.CELLGetValue(0, 0);
+        const iQuestion = TDVote.CELLGetValue(0, 0);
+        const oQuestion = this.GetQuestion(iQuestion);
+        Object.assign(TDVote.external, { min: oQuestion.min, max: oQuestion.max, ready: oQuestion.min === 0 });
         // add to our voter count chart data
         for (let i = 0, iTo = TDVote.ROWGetCount(); i < iTo; i++) {
             this.m_oD3Bar.AddAnswer(iQuestion, [
@@ -763,7 +797,7 @@ export class CPageOne extends CPageSuper {
                 eRoot.appendChild(eVote);
                 if (this.HISTORYFindPoll(this.GetActivePoll()) === false && this.poll.count < 1) {
                     if (eVote) {
-                        eVote.innerHTML = `<button class='button is-white is-rounded is-primary is-large' style='width: 300px;'>RÖSTA</button>`;
+                        eVote.innerHTML = "<button class='button is-white is-rounded is-primary is-large' style='width: 300px;'>" + this.GetLabel("vote") + "</button>";
                     }
                     let eButtonVote = eVote.querySelector("button");
                     eButtonVote.setAttribute("disabled", "");
@@ -773,7 +807,7 @@ export class CPageOne extends CPageSuper {
                     });
                 }
                 else {
-                    eVote.innerText = "Röst är registrerad för aktuell fråga.";
+                    eVote.innerText = this.GetLabel("vote_exist");
                 }
             }
         }
@@ -808,6 +842,8 @@ export class CPageOne extends CPageSuper {
             let eChart = eSection.querySelector('[data-type="chart"]');
             this.m_oD3Bar.AddQuestion(iQuestion, sName, eChart); // Add question to d3 chart
             eD3Bars.appendChild(eSection);
+            let oQuestion = new CQuestion({ key: iQuestion, min: oTD.CELLGetValue(i, "Min"), max: oTD.CELLGetValue(i, "Max") });
+            this.m_aQuestion.push(oQuestion);
         });
         this.m_oPageState.SetCondition(aCondition);
     }
@@ -1029,8 +1065,9 @@ export class CPageOne extends CPageSuper {
         let oTT = this.m_oUITableText.poll_search;
         let eToolbar = oTT.GetSection("toolbar");
         let eRoot = eToolbar.querySelector('[data-container="hashtag"]');
-        eRoot.innerHTML = "";
         eRoot.style.display = "block";
+        let eHashtag = eRoot.querySelector('[data-part="tag"]');
+        eHashtag.innerHTML = "";
         let oTD = new CTableData({ id: oResult.id, name: oResult.name });
         const aHeader = oResult.table.header;
         CPageSuper.ReadColumnInformationFromHeader(oTD, aHeader, (iIndex, oColumn, oTD) => {
@@ -1049,7 +1086,7 @@ export class CPageOne extends CPageSuper {
         };
         const options = {
             //dispatch: oDispatch,
-            parent: eRoot,
+            parent: eHashtag,
             section: ["body"],
             table: oTD,
             style: oStyle,
@@ -1062,7 +1099,6 @@ export class CPageOne extends CPageSuper {
                         const iRow = parseInt(eRow.dataset.line, 10);
                         const iKey = oTD.CELLGetValue(iRow, "BadgeK");
                         const sName = oTD.CELLGetValue(iRow, "FName");
-                        //this.QUERYGetPollList( [[iKey, sName]] );
                     }
                 }
                 return true;
@@ -1157,6 +1193,10 @@ export class CPageOne extends CPageSuper {
     }
     /**
      * Create dropdown for setting snapshots for selecting poll and pager to move in result
+     * <section data-section"toolbar">
+     *    <div data-container="hashtag">
+     *    <div data-container="command">
+     *
      * @param {any} oResult query data that contains snapshot information
      */
     PAGECreateToolbarForSearch(oResult) {
@@ -1166,6 +1206,9 @@ export class CPageOne extends CPageSuper {
         eDiv.dataset.container = "hashtag";
         eDiv.className = "box";
         eDiv.style.display = "none";
+        eDiv.innerHTML =
+            `<header data-part="command"><input class="input is-primary" type="text" placeholder="Primary input"></header>
+<p data-part="tag"></p>`;
         eToolbar.appendChild(eDiv);
         let eToolbarCommand = document.createElement("div");
         eToolbarCommand.dataset.container = "command";
@@ -1226,11 +1269,13 @@ export class CPageOne extends CPageSuper {
                 dispatch: oDispatch,
                 members: { page_max_count: 10, page_count: oTT.ROWGetCount() },
                 parent: eContainer,
+                style: { html_page_current: "span.button is-static is-primary is-outlined mr-1" },
                 callback_action: function (sAction, e) {
                     const [sType, sItem] = sAction.split(".");
                     if (sType === "render" || sType === "create") {
                         let eComponent = e.eElement;
                         let ePrevious = eComponent.querySelector('[data-type="previous"]');
+                        let eCurrent = eComponent.querySelector('[data-type="current"]');
                         let eNext = eComponent.querySelector('[data-type="next"]');
                         if (sType === "create") {
                             ePrevious.className = "button is-primary is-outlined mr-1";
@@ -1240,6 +1285,7 @@ export class CPageOne extends CPageSuper {
                             const iPage = this.members.page;
                             const iCount = this.members.page_count;
                             const iMax = this.members.page_max_count;
+                            eCurrent.innerText = (iPage + 1).toString();
                             if (iPage === 0) {
                                 ePrevious.disabled = true;
                                 ePrevious.innerText = "Föregående";

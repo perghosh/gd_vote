@@ -15,6 +15,20 @@ namespace details {
       state?: { [key_name: string]: string|number|boolean } // state items for page
    }
 
+   /**
+    * options for CQuestion
+    * @type {Object}
+    */
+   export type question_construct = {
+      key: number,    // key for question
+      min?: number,   // min vote count for question
+      max?: number,   // max vote count for question
+   }
+
+   /**
+    * options for CQuestion
+    * @type {Object}
+    */
    export type state_construct = {
       container: HTMLElement,// container element for result markup
       isolated?: boolean;  // if state is runned alone, do not update page when state is ready
@@ -111,7 +125,7 @@ export class CPageSuper {
             let eError = <HTMLElement>eFooter.querySelector("[data-error]");
 
 
-            let iCount = oTD.CountValue([ -1, "check" ], 1); // c
+            let iCount = oTD.CountValue([ -1, "check" ], 1); // Count values in "check" column, check column is inserted after result is read in page.
             const iMax = oTD.external.max;
             if(typeof iMax === "number") {                        // found max property ? Then this is 
                if(iMax < iCount) {
@@ -140,7 +154,22 @@ export class CPageSuper {
    }
 }
 
+export class CQuestion {
+   m_iKey: number;       // Question key
+   m_iCountMin: number;  // Min number of votes for question
+   m_iCountMax: number;  // Max number of votes for question
 
+   constructor( options: details.question_construct ) {
+      const o = options;
+      this.m_iKey = o.key;
+      this.m_iCountMin = typeof o.min === "number" ? o.min : 1;
+      this.m_iCountMax = typeof o.max === "number" ? o.max : 1;
+   }
+
+   get key() { return this.m_iKey; }
+   get min() { return this.m_iCountMin; }
+   get max() { return this.m_iCountMax; }
+}
 
 
 /**

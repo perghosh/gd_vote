@@ -75,7 +75,7 @@ export class CPageSuper {
                     let oTT = oEventData.dataUI;
                     let eFooter = oTT.GetSection("footer");
                     let eError = eFooter.querySelector("[data-error]");
-                    let iCount = oTD.CountValue([-1, "check"], 1); // c
+                    let iCount = oTD.CountValue([-1, "check"], 1); // Count values in "check" column, check column is inserted after result is read in page.
                     const iMax = oTD.external.max;
                     if (typeof iMax === "number") { // found max property ? Then this is 
                         if (iMax < iCount) {
@@ -104,6 +104,17 @@ export class CPageSuper {
                 break;
         }
     }
+}
+export class CQuestion {
+    constructor(options) {
+        const o = options;
+        this.m_iKey = o.key;
+        this.m_iCountMin = typeof o.min === "number" ? o.min : 1;
+        this.m_iCountMax = typeof o.max === "number" ? o.max : 1;
+    }
+    get key() { return this.m_iKey; }
+    get min() { return this.m_iCountMin; }
+    get max() { return this.m_iCountMax; }
 }
 /**
  * Internal state for sections in page

@@ -78,6 +78,7 @@ div[data-section="container"]
          <div id="idPollOverview" class="box has-background-success-light">
             <h1 class="title is-2" data-title></h1>
             <p data-description></p>
+            <article class="content block box" data-article></article>
 
             <!-- Present poll result as bar chart, one for each question-->
             <article class="panel" data-section="d3bars" style="width:  100%; margin-top: 1em; padding: 5px;">
@@ -321,9 +322,10 @@ div[data-section="container"]
    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.1/css/bulma.min.css">
    <!-- fontawesome -->
    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" integrity="sha512-iBBXm8fW90+nuLcSKlbmrPcLa0OT92xO1BIsZ+ywDWZCvqsWgccV3gFoRBv0z+8dLJgyAHIhR35VZc2oM/gI1w==" crossorigin="anonymous" />
-
    <!-- d3 -->
    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/6.7.0/d3.js"></script>
+   <!-- markdown -->
+   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>   
    <style>
       :root {
          --gd-blue: #0d6efd;

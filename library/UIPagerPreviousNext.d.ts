@@ -9,6 +9,7 @@ declare namespace details {
     };
     type style = {
         html_button?: string;
+        html_page_current?: string;
     };
     type construct = {
         callback_action?: ((sType: string, e: EventDataTable) => boolean) | ((sType: string, e: EventDataTable) => boolean)[];

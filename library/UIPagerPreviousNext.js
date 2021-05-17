@@ -128,6 +128,7 @@ export class CUIPagerPreviousNext {
         eComponent = eComponent || this.m_eComponent;
         let sClass;
         let sHtml = CTableData.GetPropertyValue(this.m_oStyle, false, "html_button");
+        let sHtmlPageCurrent = CTableData.GetPropertyValue(this.m_oStyle, false, "html_page_current");
         let sStyle = CTableData.GetPropertyValue(this.m_oStyle, false, "style_button") || "";
         if (!sHtml)
             sHtml = "button";
@@ -138,9 +139,13 @@ export class CUIPagerPreviousNext {
         }
         let self = this;
         let add_button = function (sHtml, sStyle, sClass, sType) {
-            let e = document.createElement(sHtml);
+            let aHtml = sHtml.split(".");
+            let e = document.createElement(aHtml[0]);
             if (sStyle)
                 e.style.cssText = sStyle;
+            sClass = sClass || "";
+            if (aHtml.length > 1)
+                sClass += " " + aHtml[1];
             if (sClass)
                 e.className = sClass;
             e.dataset.type = sType;
@@ -152,6 +157,10 @@ export class CUIPagerPreviousNext {
             if (self._on_action("click", eEvent, "move.previous") !== false)
                 this.MovePrevious();
         });
+        if (typeof sHtmlPageCurrent === "string") {
+            e = add_button(sHtmlPageCurrent, "", "", "current");
+            eComponent.appendChild(e);
+        }
         e = add_button(sHtml, sStyle, sClass, "next");
         eComponent.appendChild(e);
         e.addEventListener("click", (eEvent) => {
