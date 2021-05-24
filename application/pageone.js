@@ -49,7 +49,7 @@ export class CPageOne extends CPageSuper {
         const o = oOptions || {};
         this.m_oD3Bar = new CD3Bar();
         this.m_bFilterConditionCount = false;
-        this.m_oPoll = { poll: -1, vote: -1, count: 0 };
+        this.m_oPoll = { poll: -1, vote: -1, count: 0, tie: true };
         this.m_sQueriesSet = o.set || "";
         this.m_sSession = o.session || null;
         this.m_oState = o.state || {};
@@ -534,12 +534,17 @@ export class CPageOne extends CPageSuper {
         const iLinkCount = oTD.CELLGetValue(0, "CountLink"); // Links associated with poll
         const iVoteCount = oTD.CELLGetValue(0, "MyCount"); // if registered voter has voted in this poll
         const iIpCount = oTD.CELLGetValue(0, "IpCount"); // if count number of votes for ip number
+        const iTie = oTD.CELLGetValue(0, "Tie"); // if vote answers are tied, when tied votes can be filtered
         if (typeof iVoteCount === "number")
             this.poll.count = iVoteCount;
         else
             this.poll.count = 0;
         if (this.IsVoter() === false && iIpCount > 0) {
             this.poll.count = iIpCount;
+        }
+        this.poll.tie = false;
+        if (iTie === 1) {
+            this.poll.tie = true;
         }
         if (iQuestionCount > 0) {
             // ## Generate title for poll
@@ -577,6 +582,7 @@ export class CPageOne extends CPageSuper {
         else {
             eLink.style.display = "none";
         }
+        this.CallOwner("select-poll-data", this.poll);
     }
     /**
      * Create vote for poll question. Creates markup for possible answers to poll question

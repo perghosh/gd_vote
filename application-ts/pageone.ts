@@ -77,8 +77,9 @@ export class CPageOne extends CPageSuper {
     * @type {number} m_oPoll.poll Key for selected poll
     * @type {number} m_oPoll.vote Key for vote that voter just has voted for (temporary storage when vote is sent to server)
     * @type {number} m_oPoll.count number of votes found for selected poll and voter
+    * @type {number} m_oPoll.tie if poll answers for voter is glued together
     */
-   m_oPoll: { poll: number, vote: number, count: number };
+   m_oPoll: { poll: number, vote: number, count: number, tie: boolean };
    m_aQuestion: CQuestion[];
    m_oState: { [ key_name: string ]: string | number | boolean }; // States for page, may be used for outside actions
    m_sSearchMode: string;           // Search mode (this is top section in page), valid types are "hash", "field", "area", "personal"
@@ -97,7 +98,7 @@ export class CPageOne extends CPageSuper {
 
       this.m_bFilterConditionCount = false;
 
-      this.m_oPoll = { poll: -1, vote: -1, count: 0 };
+      this.m_oPoll = { poll: -1, vote: -1, count: 0, tie: true };
       this.m_sQueriesSet = o.set || "";
       this.m_sSession = o.session || null;
       this.m_oState = o.state || {};
@@ -630,11 +631,17 @@ export class CPageOne extends CPageSuper {
       const iLinkCount = <number>oTD.CELLGetValue(0, "CountLink");// Links associated with poll
       const iVoteCount = <number>oTD.CELLGetValue(0, "MyCount");// if registered voter has voted in this poll
       const iIpCount = <number>oTD.CELLGetValue(0, "IpCount");// if count number of votes for ip number
+      const iTie = <number>oTD.CELLGetValue(0, "Tie");// if vote answers are tied, when tied votes can be filtered
       if( typeof iVoteCount === "number" ) this.poll.count = iVoteCount;
       else this.poll.count = 0;
 
       if(this.IsVoter() === false && iIpCount > 0) {
          this.poll.count = iIpCount;
+      }
+
+      this.poll.tie = false;
+      if(iTie === 1) {
+         this.poll.tie = true;
       }
 
       if(iQuestionCount > 0) {
@@ -672,6 +679,8 @@ export class CPageOne extends CPageSuper {
          this.QUERYGetPollLinks( this.GetActivePoll() );
       }
       else { eLink.style.display = "none"; }
+
+      this.CallOwner("select-poll-data", this.poll);
    }
 
 

@@ -50,7 +50,7 @@ div[data-section="container"]
       [data-index="2"]
 -->
       <div data-section="container" data-page-type="vote">
-         <div data-section="tab" class="tabs is-medium">
+         <div id="idTabsMain" data-section="tab" class="tabs is-medium">
             <ul>
                <li class="is-active" data-index="1"><a data-translate="page.vote.Vote">Rösta</a></li>
                <li data-index="2"><a data-translate="page.vote.Result">Filtrera röster</a></li>
@@ -156,6 +156,12 @@ div[data-section="container"]
             let e = document.getElementById("idResultVoteCount");
             e.querySelector("i").className = "fas fa-chevron-down";
             e.querySelector("article").dataset.view = "none";
+         }
+         else if(sOperation === "select-poll-data") {
+            let e = document.getElementById("idTabsMain").querySelector('[data-index="2"]');
+            if(data.tie === false) { e.style.display = "none"; }
+            else { e.style.display = "block"; }
+
          }
          else if(sOperation === "table") {
             if( data.name === "poll_search" ) {
