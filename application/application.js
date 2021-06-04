@@ -102,5 +102,8 @@ export class CApplication {
         else if (sMethod === "alias") {
             oApplication.m_sAlias = e.sResponseText;
         }
+        else if (sMethod === "set-language") {
+            oApplication.CallOwner(sMethod, e);
+        }
     }
 } // class CApplication

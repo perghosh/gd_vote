@@ -13,7 +13,7 @@
    -->
 
 
-   <div class="container" style="border:  3px solid #3aaa35; border-radius:  1em; padding: 1em;">
+   <div id="idPage" class="container" style="border:  3px solid #3aaa35; border-radius:  1em; padding: 1em;">
       <div style="position: absolute; top: 1em; right: 1em; opacity: 0.1; max-width: 150px;">
          <img src="res/icon_medium.jpg" alt="logo">
       </div>
@@ -48,20 +48,22 @@ div[data-section="container"]
    div[data-section="content"]
       [data-index="1"]
       [data-index="2"]
+
+JS: SetActiveState is used to switch state in page      
 -->
       <div data-section="container" data-page-type="vote">
          <div id="idTabsMain" data-section="tab" class="tabs is-medium">
             <ul>
-               <li class="is-active" data-index="1"><a data-translate="page.vote.Vote">Rösta</a></li>
-               <li data-index="2"><a data-translate="page.vote.Result">Filtrera röster</a></li>
-               <li data-index="3"><a data-translate="page.vote.Search">Välj omröstning</a></li>
+               <li class="is-active" data-index="1"><a data-translate="page.vote">Rösta</a></li>
+               <li data-index="2"><a data-translate="page.result">Selektera röster</a></li>
+               <li data-index="3"><a data-translate="page.search">Sök omröstning</a></li>
             </ul>
          </div>
 
          <div id="idContent" class="box" data-section="content">
             <!-- Vote section, here voter are able to vote, query = poll_question_list / poll_answer -->
             <div id="idPollTitle" class="is-size-3 has-text-weight-bold" style="color: #3aaa35; text-align: right; margin-bottom: 1em; margin-right: 1em;"></div>
-            <div id="idPollOverviewRelated" class="is-size-5 has-text-weight-bold" style="color: #3aaa35;"></div>            
+            <article id="idPollOverviewRelated" class="is-active is-size-5 has-text-weight-bold" data-index="1" style="color: #3aaa35;"></article>
             <article id="idPollVote" class="is-active" data-index="1" data-state="body.vote">
             </article>
 
@@ -87,7 +89,7 @@ div[data-section="container"]
 
 <!-- <i class="fas fa-chevron-down"></i> -->
             <div id="idResultVoteCount" class="box">
-               <div><a class="is-pulled-right is-size-6 has-text-weight-semibold" style="position: relative; top: -0.7em;">Lista med antal röster&nbsp;<i class="fas fa-chevron-down"></i></a></div>
+               <div><a class="is-pulled-right is-size-6 has-text-weight-semibold" style="position: relative; top: -0.7em;" data-translate="page.votecountlist">Lista med antal röster&nbsp;<i class="fas fa-chevron-down"></i></a></div>
                <!-- Present poll result, after voter has voted or setting filter from vote count
                     This section is hidden from user and to show it user need to click on the button above
                -->
@@ -95,7 +97,7 @@ div[data-section="container"]
                </article>
             </div>
             <article class="panel has-background-white" data-section="link" style="display: none; margin-top: 1em; padding: 5px;">
-               <p class="panel-heading" data-translate="page.vote.TitleLinks">Länkar</p>
+               <p class="panel-heading" data-translate="page.titlelinks">Länkar</p>
             </article>               
          </div>
 
@@ -117,6 +119,8 @@ div[data-section="container"]
       function PAGE_Callback(sOperation, data) {
          if( sOperation === "load" ) {                      // queries are loaded for user, here you can sart
 
+            // ## Get url parameters
+            // 
             const sQueryString = window.location.search;
             const oParams = new URLSearchParams(sQueryString);
             if(oParams.has("poll") === false) {
@@ -130,16 +134,18 @@ div[data-section="container"]
                return;
             }
 
+            const sGroup = oParams.get("group");            // if group then set group to search query and hashtag query
+            if( sGroup === "1" ) this.state.set_poll_group = true;
+
             this.SetActivePoll( iPoll );
+
+            const sLanguage = oParams.get("language");      // language parameter
+            if( sLanguage ) {
+               window.app.request.Load(`translate_${sLanguage}.json`, "application/json", "set-language");
+            }
          }
          else if( sOperation === "insert-voter" ) {
             window.app.page.OpenMessage("Användaren är registrerad och kan rösta efter att ha loggat in igen!");
-         }
-         else if( sOperation === "ready-poll-list" ) {
-            if(this.state.read_url === true) {                                // check url for poll parameter
-               delete this.state.read_url;
-               this.URLReadSelectedPoll();
-            }
          }
          else if(sOperation === "server-session") {
             if( !this.page) {
@@ -172,6 +178,10 @@ div[data-section="container"]
                e.style.marginBottom = "10px";
             }
          }
+         else if( sOperation === "set-language" ) {
+            const oLanguage = JSON.parse( data.sResponseText );
+            window.app.page.TRANSLATEPage( oLanguage );
+         }
       }
 
       /*
@@ -201,9 +211,14 @@ div[data-section="container"]
             
             eContent.querySelectorAll(".is-active").forEach(e => { e.classList.remove("is-active"); }); // close all content pages
 
+            let sState; // state that is activated
+            let ePanel; // panel to open
             // Open content page for tab
-            eContent = eContent.querySelector(`[data-index="${iTabIndex}"]`);
-            eContent.classList.add("is-active");
+            eContent.querySelectorAll(`[data-index="${iTabIndex}"]`).forEach(e => { // open all content matching index
+               e.classList.add("is-active"); 
+               if( e.dataset.state ) ePanel = e;
+            }); 
+            //eContent.classList.add("is-active");
 
             // ## Process page operation based on what tab that is selected
             if(eContainer.dataset.pageType === "vote") {
@@ -214,9 +229,9 @@ div[data-section="container"]
                // ## Here we open voting, filter or select poll
                //
 
-               if( eContent.dataset.one === "1") return;                        // Do we need to get result for this again, if 1 then information is set
-               oPage.SetActiveState(eContent.dataset.state, eContent);          // Set the page state for vote section (results or voting)
-               if(oPage.GetActivePoll() > 0) oPage.SetActivePoll(oPage.GetActivePoll());
+               if( ePanel.dataset.one === "1") return;                          // Do we need to get result for this again, if 1 then information is set
+               oPage.SetActiveState(ePanel.dataset.state, ePanel);              // Set the page state for vote section (results or voting)
+               if(oPage.GetActivePoll() > 0) oPage.SetActivePoll(oPage.GetActivePoll(), -1 );
             }
          });
 
@@ -312,11 +327,6 @@ div[data-section="container"]
          PAGE_Setup();
       });
 
-
-      var aLogon = [
-         [ "Namn", "E-Mejl", "Lösenord" ],
-         [ "?", "?", "?" ]
-      ];
 // #endregion
    </script>
 

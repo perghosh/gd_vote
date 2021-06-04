@@ -49,7 +49,7 @@ declare namespace details {
             class_value_error?: string;
             html_group?: string;
             html_header?: string;
-            html_cell?: string;
+            html_cell?: string | string[];
             html_cell_header?: string;
             html_cell_footer?: string;
             html_row?: string | string[];

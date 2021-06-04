@@ -1,5 +1,6 @@
 declare namespace details {
     type condition = {
+        flags?: string;
         id?: string;
         value?: unknown;
         operator?: number | string;
@@ -30,6 +31,13 @@ export declare class CQuery {
     constructor(options?: details.construct);
     get values(): details.value | details.value[];
     set values(aValue: details.value | details.value[]);
+    /**
+     * [CONDITIONAdd description]
+     * @param {string}  sTable   id for table
+     * @param {string}  sId      id to condition
+     * @param {unknown} _value   condition value
+     * @param {number}  [iOperator] operator number, used in condition (0 = equal, 1 = less than, etc. )
+     */
     CONDITIONAdd(sTable: string, sId: string, _value: unknown, iOperator?: number): any;
     CONDITIONAdd(oCondition: {
         table: string;

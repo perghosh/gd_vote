@@ -1328,8 +1328,18 @@ export class CUITableText {
                         if (callRenderer) {
                             callRenderer.call(this, e, sValue, [[iIndex, i], [iRow, iC], oColumn]); // custom render for column
                         }
-                        else if (sValue !== null && sValue != void 0)
-                            e.innerText = sValue.toString();
+                        else if (sValue !== null && sValue != void 0) {
+                            if (e.dataset.c)
+                                e.innerText = sValue.toString();
+                            else {
+                                while ((e = e.firstElementChild) !== null) {
+                                    if (e.dataset.c) {
+                                        e.innerText = sValue.toString();
+                                        break;
+                                    }
+                                }
+                            }
+                        }
                         else if (e.hasAttribute("value") === false)
                             e.innerText = " ";
                     }
@@ -1739,34 +1749,73 @@ export class CUITableText {
         this.m_iRowCount = aBody.length; // set number of rows in body
         if (this.m_iRowCount === 0)
             return eSection; // no rows, just skip  creation
-        let sClass;
+        //      let sClass: string;
         let sStyle = CTableData.GetPropertyValue(this.m_oStyle, false, "value") || null;
         let _HtmlRow = CTableData.GetPropertyValue(this.m_oStyle, false, "html_row_body") || CTableData.GetPropertyValue(this.m_oStyle, false, "html_row") || "div";
         let _HtmlBefore = CTableData.GetPropertyValue(this.m_oStyle, false, "html_row_body_before") || _HtmlRow;
         let _HtmlAfter = CTableData.GetPropertyValue(this.m_oStyle, false, "html_row_body_after") || _HtmlRow;
         let _HtmlContainer = CTableData.GetPropertyValue(this.m_oStyle, false, "html_row_body_container"); // if row is more than one row this could be used to group rows within container element
-        let sHtmlCell = CTableData.GetPropertyValue(this.m_oStyle, false, "html_cell") || "span"; // span is default for cell
+        let _HtmlCell = CTableData.GetPropertyValue(this.m_oStyle, false, "html_cell") || "span"; // span is default for cell
+        //      let sHtmlCell: string = <string>CTableData.GetPropertyValue(this.m_oStyle, false, "html_cell") || "span"; // span is default for cell
         let sHtmlValue = CTableData.GetPropertyValue(this.m_oStyle, false, "html_value");
         if (typeof sHtmlValue === "string")
             sHtmlValue = sHtmlValue.trim();
         this.set_state(sHtmlValue, 1 /* HtmlValue */); // set state if cell is a dom tree or not
-        if (!sHtmlCell)
-            sHtmlCell = "span"; // span is default element for values
-        if (sHtmlCell.indexOf(".") !== -1) {
-            let a = sHtmlCell.split(".");
-            if (a.length > 1)
-                [sHtmlCell, sClass] = a; // element for value, this can be element name and class if format is in "element_name.class_names" like "span.value".
+        if (!_HtmlCell)
+            _HtmlCell = "span"; // span is default element for values
+        else if (Array.isArray(_HtmlCell)) {
+            let a = [];
+            _HtmlCell.forEach(s => {
+                a.push(s.split("."));
+            });
+            _HtmlCell = a;
         }
-        let set_row_attr = (eRow, iRow, aColumn, sCell, sValue, sStyle, sClass) => {
+        /*
+              if(!sHtmlCell) sHtmlCell = "span";                                       // span is default element for values
+              if( sHtmlCell.indexOf(".") !== -1 ) {
+                 let a = sHtmlCell.split(".");
+                 if(a.length > 1) [ sHtmlCell, sClass ] = a;                           // element for value, this can be element name and class if format is in "element_name.class_names" like "span.value".
+              }
+        */
+        let set_row_attr = (eRow, iRow, aColumn, _HtmlCell, sValue, sStyle) => {
             eRow.dataset.r = iRow.toString();
             eRow.dataset.c_row = "C" + aColumn.join(",C") + ",";
             aColumn.forEach((i, j) => {
+                let e;
+                let eCell;
                 let iColumn = this._column_in_ui(i);
                 if (iColumn === -1)
                     iColumn = j;
+                if (typeof _HtmlCell === "string") {
+                    eCell = e = document.createElement(_HtmlCell);
+                }
+                else if (Array.isArray(_HtmlCell)) {
+                    _HtmlCell.forEach((a, i) => {
+                        if (Array.isArray(a)) {
+                            e = document.createElement(a[0]);
+                            if (a.length > 1)
+                                e.className = a[1];
+                            if (a.length > 2)
+                                e.style.cssText = a[2];
+                            if (eCell === undefined)
+                                eCell = e;
+                            else
+                                eCell.appendChild(e);
+                        }
+                        else {
+                            if (i === 0)
+                                eCell = document.createElement(a);
+                            else if (i === 1)
+                                eCell.className = a;
+                            else if (i === 2)
+                                eCell.style.cssText = a;
+                        }
+                    });
+                }
+                /*
                 let e = document.createElement(sHtmlCell);
-                if (sClass)
-                    e.className = sClass;
+                if( sClass ) e.className = sClass;
+                */
                 e.dataset.c = iColumn.toString();
                 const oFormat = this.m_aColumnFormat[iColumn];
                 if (typeof oFormat.html === "string")
@@ -1775,7 +1824,7 @@ export class CUITableText {
                     e.innerHTML = sHtmlValue;
                 if (sStyle)
                     e.style.cssText = sStyle;
-                eRow.appendChild(e);
+                eRow.appendChild(eCell);
             });
         };
         // ## oRowRows is a temporary CRowRows object used to make it easier to create the markup tree for row in browser
@@ -1797,18 +1846,18 @@ export class CUITableText {
         while (aRowLevel[iLevelIndex] < 0) { // rows before main row
             let aRow = this._create_row(_HtmlBefore);
             oRowRows.SetRowElement(iLevelIndex, aRow[1]);
-            set_row_attr(aRow[1], aRowLevel[iLevelIndex], oRowRows.GetRowColumns(iLevelIndex), sHtmlCell, sHtmlValue, sStyle, sClass);
+            set_row_attr(aRow[1], aRowLevel[iLevelIndex], oRowRows.GetRowColumns(iLevelIndex), _HtmlCell, sHtmlValue, sStyle);
             aRow[1].dataset.i = iLevelIndex.toString();
             iLevelIndex++;
         }
         oRowRows.SetRowElement(iLevelIndex, aRowMain[1]); // main row
-        set_row_attr(aRowMain[1], aRowLevel[iLevelIndex], oRowRows.GetRowColumns(iLevelIndex), sHtmlCell, sHtmlValue, sStyle, sClass);
+        set_row_attr(aRowMain[1], aRowLevel[iLevelIndex], oRowRows.GetRowColumns(iLevelIndex), _HtmlCell, sHtmlValue, sStyle);
         aRowMain[1].dataset.i = iLevelIndex.toString();
         iLevelIndex++;
         if (aRowLevel[iLevelIndex] > 0) { // rows after main row
             let aRow = this._create_row(_HtmlAfter);
             oRowRows.SetRowElement(iLevelIndex, aRow[1]);
-            set_row_attr(aRow[1], aRowLevel[iLevelIndex], oRowRows.GetRowColumns(iLevelIndex), sHtmlCell, sHtmlValue, sStyle, sClass);
+            set_row_attr(aRow[1], aRowLevel[iLevelIndex], oRowRows.GetRowColumns(iLevelIndex), _HtmlCell, sHtmlValue, sStyle);
             aRow[1].dataset.i = iLevelIndex.toString();
             iLevelIndex++;
         }

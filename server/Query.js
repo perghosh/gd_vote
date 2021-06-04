@@ -82,6 +82,8 @@ export class CQuery {
                 eCondition.setAttribute("simple", o.simple);
             if (o.group)
                 eCondition.setAttribute("simple", o.group);
+            if (o.flags)
+                eCondition.setAttribute("flags", o.flags);
         });
         return doc;
     }

@@ -67,6 +67,14 @@ export declare class CRequest {
     GetJson(oJson: {
         [key: string]: string | number;
     }): string;
+    Load(sFile: string, sMimeType: string, sName?: string): void;
+    /**
+     * Call server method or methods.
+     * @param {string}    sMethod Server method or methods that is  called
+     * @param {object}    oParameters
+     * @param {string}    sData   [description]
+     * @param {string}    sUrl    [description]
+     */
     Get(sMethod: string, oParameters: {
         [key: string]: string;
     }, sData?: string, sUrl?: string): void;
@@ -75,10 +83,10 @@ export declare class CRequest {
     }, sData: string, sUrl?: string): void;
     /**
      * Execute callbacks with data from server
-     * @param {Document} oXml xml document from server
+     * @param {Document | string} _Xml xml document from server
      * @param {string}   sResult all result text from server
      * @param {number}   iStatus server response status
      */
-    CallProcess(oXml: Document, sResult: string, iStatus: number): void;
+    CallProcess(_Xml: Document | string, sResult: string, iStatus: number): void;
 }
 export {};

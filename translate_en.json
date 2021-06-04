@@ -1,0 +1,18 @@
+{
+   "page": {
+      "vote": "Vote",
+      "result": "Select votes",
+      "search": "Search poll",
+      "titlelinks": "Links related to poll",
+      "votecountlist": "Vote count for answers in poll "
+   },
+   "add_filter": "Select votes",
+   "next": "Next",
+   "previous": "Previous",
+   "remove_filter": "Unselect votes",
+   "vote": "VOTE",
+   "vote_exist": "Vote is registered for the current poll",
+   "filter_headers": "Question|Answer|Vote count",
+   "search_headers": "Name|Description|Begin|End",
+   "search_snapshots": "all,All|yesno,Active Yes/No polls|active,Active"
+}
