@@ -281,7 +281,7 @@ export var edit;
          * @param  {number}  iKey number for key
          * @return {boolean}  true if key is valid move key
          */
-        IsMoveKey(iKey) {
+        IsMoveKey(iKey, e) {
             if (this.m_aMoveKey) {
                 let i = this.m_aMoveKey.length;
                 while (--i >= 0) {

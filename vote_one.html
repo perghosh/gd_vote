@@ -84,7 +84,7 @@ JS: SetActiveState is used to switch state in page
             <article class="content block box" data-article></article>
 
             <!-- Present poll result as bar chart, one for each question-->
-            <article class="panel" data-section="d3bars" style="width:  100%; margin-top: 1em; padding: 5px;">
+            <article class="panel" data-section="d3bars" style="width: 100%; margin-top: 1em; padding: 5px;">
             </article>
 
 <!-- <i class="fas fa-chevron-down"></i> -->
@@ -98,6 +98,9 @@ JS: SetActiveState is used to switch state in page
             </div>
             <article class="panel has-background-white" data-section="link" style="display: none; margin-top: 1em; padding: 5px;">
                <p class="panel-heading" data-translate="page.titlelinks">Länkar</p>
+            </article>               
+            <article class="panel has-background-white" data-section="comment" style="margin-top: 1em; padding: 5px;">
+               <p class="panel-heading" data-translate="page.comment">Kommentarer</p>
             </article>               
          </div>
 
@@ -337,6 +340,7 @@ JS: SetActiveState is used to switch state in page
    <title>Vote</title>
    <!-- Bulma css -->
    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.1/css/bulma.min.css">
+   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma-helpers/0.4.0/css/bulma-helpers.min.css" integrity="sha512-U6ELnUi7oqVEjkLmFw5r5UR5LEtvpImS/jUykBKneVhD0lxZxfJZ3k3pe003ktrtNZYungd9u3Urp2X09wKwXg==" crossorigin="anonymous" />
    <!-- fontawesome -->
    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" integrity="sha512-iBBXm8fW90+nuLcSKlbmrPcLa0OT92xO1BIsZ+ywDWZCvqsWgccV3gFoRBv0z+8dLJgyAHIhR35VZc2oM/gI1w==" crossorigin="anonymous" />
    <!-- d3 -->
@@ -416,7 +420,23 @@ JS: SetActiveState is used to switch state in page
       
       .malebar {
         fill: steelblue;
-      }      
+      }
+
+.vote-layout .answer {
+  display: grid;
+  grid-template-columns: 110px 1fr 2fr;
+  column-gap: 2px;
+}
+
+
+.vote-layout .answer-comment {
+  grid-column-start: 1; 
+  grid-row-start: 2;
+  grid-column-end: 4;
+}      
+
+
+
 
 
       /* Customizable styles  https://github.com/adamculpepper/toggle-switchy*/
@@ -477,11 +497,11 @@ CORE STYLES BELOW - NO TOUCHY
 .vote-check > input + .toggle .switch {border-radius:6px;}
 
 /* Size: Large */
-.vote-check[data-size='lg'] > input + .toggle				{width:95px; height:35px;}
-.vote-check[data-size='lg'] > input + .toggle > .switch	{width:35px;}
+.vote-check[data-size='lg'] > input + .toggle				{width:95px; height:25px;}
+.vote-check[data-size='lg'] > input + .toggle > .switch	{width:25px;}
 .vote-check[data-size='lg'] > input + .toggle:before,
 .vote-check[data-size='lg'] > input + .toggle:after		{font-size:1rem;}
-.vote-check[data-size='lg'] > input:not(:checked) + .toggle > .switch {right:calc(100% - 35px);}
+.vote-check[data-size='lg'] > input:not(:checked) + .toggle > .switch {right:calc(100% - 25px);}
 
 
 /* Style: Rounded */

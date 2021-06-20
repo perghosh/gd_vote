@@ -71,50 +71,69 @@ export class CPageSuper {
         switch (sName) {
             case "AfterSetValue":
                 {
-                    let oTD = oEventData.data;
-                    let oTT = oEventData.dataUI;
-                    let eFooter = oTT.GetSection("footer");
-                    let eError = eFooter.querySelector("[data-error]");
-                    let iCount = oTD.CountValue([-1, "check"], 1); // Count values in "check" column, check column is inserted after result is read in page.
-                    const iMax = oTD.external.max;
-                    if (typeof iMax === "number") { // found max property ? Then this is 
-                        if (iMax < iCount) {
-                            oTD.external.error = true;
-                            if (!eError) {
-                                let eDiv = document.createElement("div");
-                                eDiv.className = "has-text-danger has-text-weight-bold";
-                                eDiv.dataset.error = "1";
-                                eFooter.appendChild(eDiv);
-                                eError = eDiv;
+                    if (oEventData.column.id === "select-vote") {
+                        const iSetVote = v[2]; // 0 or 1 if vote is selected or not
+                        let bError = false;
+                        let oTD = oEventData.data;
+                        let oTT = oEventData.dataUI;
+                        let eFooter = oTT.GetSection("footer");
+                        let eError = eFooter.querySelector("[data-error]");
+                        let iCount = oTD.CountValue([-1, "select-vote"], 1); // Count values in "check" column, check column is inserted after result is read in page.
+                        const iMax = oTD.external.max;
+                        if (typeof iMax === "number") { // found max property ? Then this is 
+                            if (iMax < iCount) {
+                                bError = true;
+                                oTD.external.error = true;
+                                if (!eError) {
+                                    let eDiv = document.createElement("div");
+                                    eDiv.className = "has-text-danger has-text-weight-bold";
+                                    eDiv.dataset.error = "1";
+                                    eFooter.appendChild(eDiv);
+                                    eError = eDiv;
+                                }
+                                eError.innerText = `Max antal val = ${iMax}, du har valt ${iCount}`;
                             }
-                            eError.innerText = `Max antal val = ${iMax}, du har valt ${iCount}`;
+                            else {
+                                oTD.external.error = false;
+                                if (eError)
+                                    eError.innerText = "";
+                            }
+                            if (iCount >= oTD.external.min && iCount <= oTD.external.max)
+                                oTD.external.ready = true;
+                            else
+                                oTD.external.ready = false;
+                            window.app.page.IsReadyToVote(true); // Update vote button
+                            if (bError === false && oTD.external.comment === true) { // if cocmment is allowed then display comment element for vote
+                                const iRow = v[1][0];
+                                const eTR = oTT.ELEMENTGetRow(iRow);
+                                let eComment = eTR.querySelector(".answer-comment");
+                                if (iSetVote === 1)
+                                    eComment.style.display = "block";
+                                else
+                                    eComment.style.display = "none";
+                            }
                         }
-                        else {
-                            oTD.external.error = false;
-                            if (eError)
-                                eError.innerText = "";
-                        }
-                        if (iCount >= oTD.external.min && iCount <= oTD.external.max)
-                            oTD.external.ready = true;
-                        else
-                            oTD.external.ready = false;
-                        window.app.page.IsReadyToVote(true); // Update vote button
                     }
                 }
                 break;
         }
     }
 }
+/**
+ *
+ */
 export class CQuestion {
     constructor(options) {
         const o = options;
         this.m_iKey = o.key;
         this.m_iCountMin = typeof o.min === "number" ? o.min : 1;
         this.m_iCountMax = typeof o.max === "number" ? o.max : 1;
+        this.m_bComment = (o.comment === 1 || o.comment === true) ? true : false;
     }
     get key() { return this.m_iKey; }
     get min() { return this.m_iCountMin; }
     get max() { return this.m_iCountMax; }
+    get comment() { return this.m_bComment; }
 }
 /**
  * Internal state for sections in page

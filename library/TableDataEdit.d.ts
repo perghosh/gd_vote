@@ -127,7 +127,7 @@ export declare namespace edit {
          * @param  {number}  iKey number for key
          * @return {boolean}  true if key is valid move key
          */
-        IsMoveKey(iKey: number): boolean;
+        IsMoveKey(iKey: number, e?: any): boolean;
         SetClose(): void;
         SetFocus(): void;
         Close(eSupport?: HTMLElement): void;

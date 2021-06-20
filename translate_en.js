@@ -1,9 +1,10 @@
 {
    "page": {
-      "vote": "Vote",
+      "comment": "Comments",
       "result": "Select votes",
       "search": "Search poll",
       "titlelinks": "Links related to poll",
+      "vote": "Vote"
    },
    "add_filter": "Select votes",
    "next": "Next",

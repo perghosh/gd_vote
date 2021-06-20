@@ -422,7 +422,7 @@ export declare class CUITableText implements IUITableData {
      * Render header for table
      * @param aHeader
      */
-    render_header(aHeader: [number, [string, string]][]): HTMLElement;
+    render_header(aHeader: [number, [string, string, boolean]][]): HTMLElement;
     /**
      * Render body, body is where values from table are shown
      * @param {[ unknown[][], number[] ]} aResult Result is a two array values in array. First is
@@ -460,7 +460,7 @@ export declare class CUITableText implements IUITableData {
      * Create header element with columns
      * @param aHeader
      */
-    create_header(aHeader: [number, [string, string]][], callback?: ((eSpan: HTMLElement, sSection: string) => void)): HTMLElement;
+    create_header(aHeader: [number, [string, string, boolean]][], callback?: ((eSpan: HTMLElement, sSection: string) => void)): HTMLElement;
     /**
      * Create body, body is the section that displays values from table data. Tables are shown as rows with vales for each value in table
      * @param {unknown[][]} aBody value data that elements are created for
@@ -514,6 +514,13 @@ export declare class CUITableText implements IUITableData {
      * @param {string} sSection section name, table text has container elements with a name (section name)
      */
     private _on_action;
+    /**
+     * Split element string before creating markup for t able
+     * @param  {string | string[]} _item element string to split
+     * @param  {string} sDefault default element name
+     * @return {string | string[]} prepared string or array of strings that is used to create markup
+     */
+    private _split;
     /**
      * Return index to physical position in table data. This is needed if operations based on data is executed
      * @param iIndex

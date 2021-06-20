@@ -1,4 +1,4 @@
-﻿/*
+/*
 
 dynamic imports
 https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import#dynamic_imports
@@ -17,12 +17,15 @@ pageone = page logic for managing one vote, user can not select any votes. activ
 | QUERYGetPollOverview | Get information about selected poll. query = `poll_overview`. |
 | QUERYGetPollAllAnswers | Get all answers for poll. query = `poll_answer_all`. |
 | QUERYGetPollLinks | Get links for poll. Query used is `poll_links` |
+| QUERYGetPollOverviewVoteComments | Get vote comments for active poll `poll_vote_comments` |
+| QUERYGetSearch | Get search result for finding new vite |
 | QUERYGetPollRelated | Get links for poll. Query used is `poll_overview_related` |
 | QUERYGetPollFilterCount | Get poll result (votes are counted), conditions for filter result is also added here |
 | RESULTCreateFindVoter | Result from finding voter, this is called if user tries to login |
-| RESULTCreatePollOverview | Process result from  `poll_overview`|
+| RESULTCreatePollOverview | Process result from  `poll_overview` that has information about active poll|
 | RESULTCreateVote | Process all answers from questions in poll o avoid to many requests to server  `poll_answer_all`|
 | RESULTCreatePollOverviewLinks | Process result from `poll_links` and render these for user |
+| RESULTCreatePollOverviewVoteComments | Process result from `poll_vote_comment` that has comments from votes in poll |
 | RESULTCreatePollOverviewRelated | Process result from `poll_overview_related`, render related polls |
 | RESULTCreatePollFilterCount | Create table with poll vote count for each answer |
 | RESULTCreateQuestionPanel | Create panels for each question that belongs to current selected poll. Like containers for selectable votes |
@@ -32,6 +35,10 @@ pageone = page logic for managing one vote, user can not select any votes. activ
 | CONDITIONMarkFilterVote |  Mark items that has been filtered |
 | WalkNextState | Walks queries used to collect information for active state |
 | PAGECreateToolbarForSearch | Walks queries used to collect information for active state |
+| TRANSLATEPage | Translate page elements |
+| GENERATEPager | Generate pager for results shown i table |
+
+
 
 |Id|Description
 |:-|:-|
@@ -84,14 +91,17 @@ export class CPageOne extends CPageSuper {
    m_aPageState: CPageState[];
    m_oPageState: CPageState;        // current page state that is being processed
    /**
-    * active poll information
+    * ## active poll information
+    * The poll object is important as a state object for current selected poll. With this object you
+    * can important poll data to know how the page works.
     * @type {number} m_oPoll.poll Key for selected poll
     * @type {number} m_oPoll.vote Key for vote that voter just has voted for (temporary storage when vote is sent to server)
     * @type {number} m_oPoll.count number of votes found for selected poll and voter
     * @type {number} m_oPoll.tie if poll answers for voter is glued together
     * @type {number} m_oPoll.ip_count count votes for active ip number
+    * @type {boolean} m_oPoll.comment if poll may have comments attached to vote information
     */
-   m_oPoll: { root_poll: number, poll: number, vote: number, count: number, tie: boolean, ip_count: number };
+   m_oPoll: { root_poll: number, poll: number, vote: number, count: number, tie: boolean, ip_count: number, comment: boolean };
    m_aQuestion: CQuestion[];
    m_oState: { [ key_name: string ]: string | number | boolean }; // States for page, may be used for outside actions
    m_sSearchMode: string;           // Search mode (this is top section in page), valid types are "hash", "field", "area", "personal"
@@ -110,7 +120,7 @@ export class CPageOne extends CPageSuper {
 
       this.m_bFilterConditionCount = false;
 
-      this.m_oPoll = { root_poll: -1, poll: -1, vote: -1, count: 0, tie: true, ip_count: 0 };
+      this.m_oPoll = { root_poll: -1, poll: -1, vote: -1, count: 0, tie: true, ip_count: 0, comment: false };
       this.m_sQueriesSet = o.set || "";
       this.m_sSession = o.session || null;
       this.m_oState = o.state || {};
@@ -137,6 +147,7 @@ export class CPageOne extends CPageSuper {
 
       this.m_oLabel = {
          "add_filter": "Visa röster för",
+         "comment": "Kommentar",
          "next": "Nästa",
          "previous": "Föregående",
          "remove_filter": "Ta bort visning för",
@@ -152,6 +163,10 @@ export class CPageOne extends CPageSuper {
       }
 
       if( o.label ) { this.TRANSLATEPage() }
+/*
+      let eEditors = edit.CEditors.GetInstance();
+      eEditors.Add("string", edit.CEditInput);
+*/      
    }
 
    get app() { return this.m_oApplication; }                                   // get application object
@@ -172,6 +187,9 @@ export class CPageOne extends CPageSuper {
 
    set voter( aVoter: [number,string,string] ) { this.m_aVoter = aVoter; }
 
+   /**
+    * Get active poll key
+    */
    GetActivePoll() { return this.poll.poll; }
 
    // Get labels (text) in page
@@ -393,10 +411,15 @@ export class CPageOne extends CPageSuper {
       // ## Extract key values from, values for poll is found i page state body.vote
       const aTD = this.GetPageState("body", "vote" ).GetTableData();
       aTD.forEach( oTD => {
-         const aRow = <number[]>oTD.CountValue([ -1, "check" ], 1, enumReturn.Array); // get values from "check" column with value 1
+         const aRow = <number[]>oTD.CountValue([ -1, "select-vote" ], 1, enumReturn.Array); // get values from "check" column with value 1
          aRow.forEach(iRowKey => {
             // IMPORTANT! Column 2 in query on server gets value from "PollAnswerK". This binds user vote to answer in poll
-            aValue.push({ index: 2, value: oTD.CELLGetValue(iRowKey, "PollAnswerK") }); // column with index 2 gets key to answer
+            const a = [
+               { index: 2, value: oTD.CELLGetValue(iRowKey, "PollAnswerK") },   // answer key
+               { name: "FComment", value: oTD.CELLGetValue(iRowKey, "FComment") }// vote key
+            ];
+            aValue.push(a); // column with index 2 gets key to answer
+            //aValue.push({ index: 6, value: oTD.CELLGetValue(iRowKey, "FComment") }); 
          });
       });
 
@@ -425,6 +448,12 @@ export class CPageOne extends CPageSuper {
    }
 
 
+   /**
+    * Process server response
+    * @param {Element} eItem xml element
+    * @param {string}  sName section name for response
+    * @param {string}  sHint custom hint if found
+    */
    ProcessResponse(eItem: Element, sName: string, sHint: string ): void {
       if( eItem === null ) {
          if( sName === "user" ) this.app.GetSession();
@@ -476,6 +505,9 @@ export class CPageOne extends CPageSuper {
             }
             else if(sQueryName === "poll_links") {
                this.RESULTCreatePollOverviewLinks("idPollOverview", oResult);
+            }
+            else if(sQueryName === "poll_vote_comment") {
+               this.RESULTCreatePollOverviewVoteComments("idPollOverview", oResult);
             }
             else if(sQueryName === "poll_overview_related") {
                this.RESULTCreatePollOverviewRelated("idPollOverviewRelated", oResult);
@@ -574,6 +606,43 @@ export class CPageOne extends CPageSuper {
       let oCommand = { command: "add_condition_to_query get_result", delete: 1, query: "poll_links", set: this.queries_set, count: 50, format: 1, start: 0 };
       request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
    }
+
+   /**
+    * Get comments for poll answers
+    * @param {number} iPoll   Index to selected poll
+    */
+   QUERYGetPollOverviewVoteComments(iPoll?: number, oCondition?: { snapshot?: string, start?: number, index?: number }): void {
+      iPoll = iPoll || this.GetActivePoll();
+
+      let request = this.app.request;
+      let sCommand: string = "";
+      let oCommand: {[k:string]: string|number} = { query: "poll_vote_comment", set: this.queries_set, count: 10, delete: 1, format: 1, start: 0 };
+
+      let oQuery = new CQuery({
+         conditions: [ { table: "TPoll1", id: "PollK", value: iPoll } ]
+      });
+      let sXml = <string>oQuery.CONDITIONGetXml();
+
+      if( oCondition ) {
+         const iStart = oCondition.start || 0;
+         oCommand.start = iStart;
+         if( oCondition.snapshot ) {
+            oCommand.name = oCondition.snapshot;
+            sCommand += " set_snapshot";
+         }
+         if( typeof oCondition.index === "number" ) {
+            sCommand += " set_order";
+            oCommand.index = oCondition.index;
+            this.m_oUITableText.poll_vote_comments = null;     // full render
+         }
+      }
+
+      sCommand += " get_result";
+      oCommand.command = sCommand;
+
+      request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
+   }
+
 
    
    QUERYGetPollRelated(iPoll: number): void {
@@ -716,6 +785,7 @@ export class CPageOne extends CPageSuper {
       const iCountPoll = <number>oTD.CELLGetValue(0, "CountPoll");// Count related polls
       const iTie = <number>oTD.CELLGetValue(0, "Tie");// if vote answers are tied, when tied votes can be filtered
       const iGroup = <number>oTD.CELLGetValue(0, "GroupId");// group poll is connected to
+      const iComment = <number>oTD.CELLGetValue(0, "CommentEnabled");// number of questions that can be commented
 
       if( typeof iVoteCount === "number" ) this.poll.count = iVoteCount;
       else this.poll.count = 0;
@@ -728,6 +798,12 @@ export class CPageOne extends CPageSuper {
       this.poll.tie = false;
       if(iTie === 1) {
          this.poll.tie = true;
+      }
+
+      this.poll.comment = false;
+      if(iComment !== 0) {
+         this.poll.comment = true;
+         this.QUERYGetPollOverviewVoteComments();  // get comments for active poll
       }
 
       if(iQuestionCount > 0) {
@@ -792,7 +868,7 @@ export class CPageOne extends CPageSuper {
       if(typeof eRoot === "string") eRoot = document.getElementById(eRoot);
 
       // ## Find key for first waiting question
-      let TDVote = new CTableData({ id: oResult.id, name: oResult.name, external: { max: 1, min: 1 } });
+      let TDVote = new CTableData({ id: oResult.id, name: oResult.name, external: { max: 1, min: 1, comment: false } });
       const aHeader = oResult.table.header;
       CPageSuper.ReadColumnInformationFromHeader(TDVote, aHeader, (iIndex, oColumn, oTD) => {
          if(oColumn.key) {
@@ -800,10 +876,10 @@ export class CPageOne extends CPageSuper {
          }
       });
       TDVote.ReadArray(oResult.table.body, { begin: 0 });
-      const iQuestion: number = <number>TDVote.CELLGetValue(0,0);
+      const iQuestion: number = <number>TDVote.CELLGetValue(0,0);               // get question object for question key, key is found in first column
       const oQuestion = this.GetQuestion( iQuestion );
 
-      Object.assign(TDVote.external, { min: oQuestion.min, max: oQuestion.max, ready: oQuestion.min === 0 });
+      Object.assign(TDVote.external, { min: oQuestion.min, max: oQuestion.max, comment: oQuestion.comment, ready: oQuestion.min === 0 });
 
       // add to our voter count chart data
       for( let i = 0, iTo = TDVote.ROWGetCount(); i < iTo; i++ ) {
@@ -819,12 +895,24 @@ export class CPageOne extends CPageSuper {
       if( !eRoot ) return;                                 // no root item then skip
 
 
-      let aColumn = TDVote.InsertColumn(2, 0, 1);
-      CTableData.SetPropertyValue(aColumn, true, "id", "check");
+      let aColumn = TDVote.InsertColumn(2, 0, 1);           // insert column at position 2, default value is 0, and only one field
+      CTableData.SetPropertyValue(aColumn, true, "id", "select-vote");
       CTableData.SetPropertyValue(aColumn, true, "alias", "Röst");
       CTableData.SetPropertyValue(aColumn, true, "edit.name", "checkbox");
       CTableData.SetPropertyValue(aColumn, true, "edit.edit", true);
       CTableData.SetPropertyValue(aColumn, true, "edit.element", 1);
+
+      if( oQuestion.comment === true ) {
+         aColumn = TDVote.InsertColumn(5, "", 1);           // insert column at position 2, default value is 0, and only one field
+         CTableData.SetPropertyValue(aColumn, true, "id", "FComment");
+         CTableData.SetPropertyValue(aColumn, true, "alias", this.GetLabel("comment") );
+         CTableData.SetPropertyValue(aColumn, true, "edit.name", "text");
+         CTableData.SetPropertyValue(aColumn, true, "edit.edit", true);
+         CTableData.SetPropertyValue(aColumn, true, "edit.element", 1);
+         CTableData.SetPropertyValue(aColumn, true, "position.header", 0);
+         CTableData.SetPropertyValue(aColumn, true, "style", { minHeight: "3em", overflowX: "auto" });
+      }
+
 
 
       TDVote.COLUMNUpdatePositionIndex();
@@ -835,8 +923,7 @@ export class CPageOne extends CPageSuper {
       let eSection = <HTMLElement>eRoot.querySelector(`section[data-question="${iQuestion}"]`);
       let eArticle = <HTMLElement>eSection.querySelector("article");
 
-
-
+/*
       let oStyle = {
          html_group: "table.table",                // "table" element and class table
          html_row: "tr",                           // "tr" element for each row
@@ -846,27 +933,48 @@ export class CPageOne extends CPageSuper {
          html_section_body: "tbody",               // "tbody" for body section
          html_section_footer: "tfoot",             // "tfoot" for footer section
       }
+*/      
+/*
+      let oStyle = {
+         html_group: "div..display: table; border-collapse: collapse;",
+         html_row: "div..display: table-row; border-bottom: 1px solid #dbdbdb;",
+         html_cell_header: "span..display: table-cell; ",
+         html_cell: "span..display: table-cell; padding: \\.3em \\.5em;",
+         html_section_header: "div..display: table-header-group; font-weight: bold;",
+         html_section_body: "div..display: table-row-group; border-bottom: 1px solid #dbdbdb;",
+         html_section_footer: "div..display: table-footer-group",
+      }
+*/
+      let oStyle = {
+         html_group: "div.vote-layout",
+         html_row: "div.answer.border-bottom: 1px solid #dbdbdb;",
+         //html_cell_header: "span..display: table-cell; ",
+         html_cell: "span..padding: \\.3em \\.5em;",
+         html_section_header: "div..font-weight: bold;",
+         html_section_body: "div",
+      }
 
       let oTrigger = new CTableDataTrigger({ table: TDVote, trigger: CPageSuper.CallbackVote });
 
       let options = {
          parent: eArticle,                         // container
-         section: [ "title", "table.header", "table.body", "footer" ],// sections to create
+         //section: [ "title", "table.header", "table.body", "footer" ],// sections to create
+         section: [ "title", "table.header", "table.body", "footer" ],
          table: TDVote,                            // source data
          name: "vote",                             // name to access UI table in CTableData
          style: oStyle,                            // styling
          edit: 1,                                  // endable edit
-         state: 0x0011,                            // SetOneClickActivate = 0x0010, HtmlValue = 0x0001
+         //state: 0x0019,                            // HtmlValue = 0x0001, SetValue = 0x0008, SetOneClickActivate = 0x0010
+         state: 0x00010,                            // HtmlValue = 0x0001, SetValue = 0x0008, SetOneClickActivate = 0x0010
          trigger: oTrigger,
       };
 
       let TTVote = new CUITableText(<uitabledata_construct><unknown>options);
       TDVote.UIAppend(TTVote);
 
-      TTVote.COLUMNSetRenderer(0, (e, v, a) => {
-         let eCheck = <HTMLElement>e.querySelector("div");
+      TTVote.COLUMNSetRenderer(0, (e, value, a) => {
          let sChecked = "";
-         if(v === "1" || v === 1) sChecked = "checked";
+         if(value === "1" || value === 1) sChecked = "checked";// if value is selected 
          let eDiv = document.createElement("div");
          eDiv.innerHTML = `
 <label class="vote-check" data-style="rounded" data-color="green" data-size="lg">
@@ -877,6 +985,15 @@ export class CPageOne extends CPageSuper {
 </label>`;
          e.appendChild(eDiv);
       });
+
+      if( oQuestion.comment === true ) {                    // if comment is allowed in question
+         TTVote.COLUMNSetRenderer(3, (e, value, a) => {
+            if( e.tagName === "TEXTAREA") return;
+            e.className = "answer-comment";
+            e.style.display = "none";
+            e.innerHTML = `<textarea class="textarea is-primary" data-value='1' style="width: 100%;" placeholder="Kommentar" rows="3"></textarea>`;
+         });
+      }
 
       TTVote.Render();
 
@@ -938,6 +1055,98 @@ export class CPageOne extends CPageSuper {
          eLink.appendChild(eA);
       }
    }
+
+   /**
+    * Process result from `poll_comments` and render these for user
+    * @param {string|HTMLElement} eRoot
+    * @param {any} oResult server result with information about comments
+    */
+   RESULTCreatePollOverviewVoteComments( eRoot: string|HTMLElement, oResult?: any ): void {
+      if(typeof eRoot === "string") eRoot = document.getElementById(eRoot);
+      let eComment = <HTMLElement>eRoot.querySelector('[data-section="comment"]');
+
+      let self = this;
+      let oTT = this.m_oUITableText.poll_vote_comments;
+      let oTD: CTableData = oTT ? oTT.data : null;
+
+      if( oTD ) {
+         oTD.ClearData("body");
+         oTD.ReadArray(oResult.table.body, { begin: 0 });
+         oTT.Render(); // render with small caps creates elements for body and renders values
+         oTT.row_page = oResult.page;                       // set active page
+         return;
+      }
+
+      eComment.innerHTML = "";                           // clear element
+
+      oTD = new CTableData({ id: oResult.id, name: oResult.name });
+      CPageSuper.ReadColumnInformationFromHeader(oTD, oResult.table.header);
+      oTD.ReadArray(oResult.table.body, { begin: 0 });
+
+      oTD.COLUMNSetPropertyValue(["ID","Ip"], "position.hide", true);
+
+      // eArticle.innerHTML = marked( sArticle );
+
+      let oStyle = {
+         html_group: "table.table is-narrow is-fullwidth pointer", // "table" element and class table
+         html_row: "tr",                           // "tr" element for each row
+         html_cell_header: "th",                   // "th" for column headers
+         html_cell: "td",                          // "td" for cells
+         html_section_header: "thead",             // "thead" for header section
+         html_section_body: "tbody",               // "tbody" for body section
+      }
+
+      let oDispatch = new CDispatch();             // Dispatcher that manages communication between pager and ui table
+
+      let options = {
+         dispatch: oDispatch,                      // dispatcher used to communicate with pager
+         max: 10,                                  // max number of rows displayed
+         parent: eComment,                         // container
+         section: [ "toolbar", "table.header", "table.body" ],// sections to create
+         server: true,                             // use server data
+         style: oStyle,                            // styling
+         table: oTD,                               // source data
+         callback_action: function(sType: string, e: EventDataTable, sSection: string) {
+            if(sType === "click" && sSection === "header") {
+               let eElement = e.eElement || e.eEvent.srcElement;
+               const aColumn = this.COLUMNGet(eElement);
+               if( aColumn ) {
+                  const oColumn = aColumn[1]; // get column object for table data
+                  let iIndex = aColumn[0] + 1; // one based index when sort is set
+                  let iSort = oColumn.state?.sorted;
+                  if( iSort === 1 ) iIndex = -iIndex;
+
+                  self.QUERYGetPollOverviewVoteComments( undefined, { index: iIndex });
+               }
+            }
+         },
+         callback_render: function( sType: string, e: EventDataTable, sSection: string, oColumn: any ) {
+            if( sType === "afterHeaderValue" ) {
+               e.eElement.style.cursor = "pointer";         // change cursor
+               let iSort = oColumn.state?.sorted;
+               if( iSort ) {
+                  let eI = document.createElement("i");
+                  eI.style.paddingLeft = ".3em";
+                  if( iSort === 1 ) eI.className = "fas fa-sort-up";
+                  else eI.className = "fas fa-sort-down";
+                  e.eElement.appendChild(eI);
+                  e.eElement.style.whiteSpace = "nowrap";
+               }
+            }
+         }
+      };
+
+      oTT = new CUITableText(options);
+      oTD.UIAppend(oTT);
+
+      oTT.Render();
+
+      this.m_oUITableText.poll_vote_comments = oTT;
+      eRoot.dataset.one = "1";                              // You do not need to fill this again
+
+
+   }
+
 
    /**
     * [RESULTCreatePollOverviewRelated description]
@@ -1048,13 +1257,12 @@ export class CPageOne extends CPageSuper {
             a[1] = <number>oTD.CELLGetValue(i,"Count");
          }
          else {
-            //a[0] = Math.floor(Math.random() * 100);
             a[0] = <number>oTD.CELLGetValue(i,"Count"); 
          }
          this.m_oD3Bar.SetAnswerCount( 
             <number>oTD.CELLGetValue(i,"PollQuestionK"), 
             <string>oTD.CELLGetValue(i,"Answer"), 
-            a //<number>oTD.CELLGetValue(i,"Count") 
+            a
          );
       }
 
@@ -1198,7 +1406,12 @@ export class CPageOne extends CPageSuper {
 
          eD3Bars.appendChild( eSection );
 
-         let oQuestion = new CQuestion({key: iQuestion, min: <number>oTD.CELLGetValue(i,"Min"), max: <number>oTD.CELLGetValue(i,"Max")});
+         let oQuestion = new CQuestion({
+            key: iQuestion,
+            min: <number>oTD.CELLGetValue(i,"Min"),
+            max: <number>oTD.CELLGetValue(i,"Max"),
+            comment: <number>oTD.CELLGetValue(i,"Comment")
+         });
          this.m_aQuestion.push( oQuestion );
          
       });
@@ -1714,6 +1927,9 @@ export class CPageOne extends CPageSuper {
 
          eToolbarCommand.appendChild(eContainer);   // add container to toolbar
 
+         let oPager = this.GENERATEPager( eContainer, oTT, oDispatch );
+
+/*
          const self = this;
          let oPager = new CUIPagerPreviousNext({
             dispatch: oDispatch, // dispatcher used to communicate with ui table
@@ -1762,6 +1978,7 @@ export class CPageOne extends CPageSuper {
                return true;
             }
          });
+*/         
 
          oDispatch.AddChain(oPager, oTT);          // connect pager with ui table
          oDispatch.AddChain(oTT, [oPager]);        // connect ui table with pager
@@ -1782,6 +1999,10 @@ export class CPageOne extends CPageSuper {
    }
 
 
+   /**
+    * Translate pager text
+    * @param {object} oLanguage object that has strings to replace page elements with
+    */
    TRANSLATEPage( oLanguage?: { [key_name: string]: string } ) {
       oLanguage = oLanguage || this.m_oLabel;
       if( oLanguage.page ) {                               // static page text that need translation
@@ -1796,6 +2017,67 @@ export class CPageOne extends CPageSuper {
       for (const [sKey, sText] of Object.entries(oLanguage)) {
          if( typeof sText === "string" ) this.m_oLabel[sKey] = sText;
       }
+   }
+
+
+   /**
+    * Generate pager for results that needs paging
+    * @param  {HTMLElement}  eContainer container element for pager
+    * @param  {CUITableText} oTT table text element that needs pager
+    * @param  {CDispatch}    oDispatch  dispatcher that connects  pager  with table text
+    * @return {CUIPagerPreviousNext} returns pager
+    */
+   GENERATEPager( eContainer: HTMLElement, oTT: CUITableText, oDispatch: CDispatch ): CUIPagerPreviousNext {
+      const self = this;
+      let oPager = new CUIPagerPreviousNext({
+         dispatch: oDispatch, // dispatcher used to communicate with ui table
+         members: { page_max_count: 10, page_count: oTT.ROWGetCount() }, // configure page sections, how many rows each page has
+         parent: eContainer, 
+         style: { html_page_current: "span.button is-static is-primary is-outlined mr-1" },
+         callback_action: function (sAction, e): boolean {
+            const [sType, sItem] = sAction.split(".");
+            if(sType === "render" || sType === "create") {
+               let eComponent = e.eElement;
+               let ePrevious = <HTMLButtonElement>eComponent.querySelector('[data-type="previous"]');
+               let eCurrent = <HTMLButtonElement>eComponent.querySelector('[data-type="current"]');
+               let eNext = <HTMLButtonElement>eComponent.querySelector('[data-type="next"]');
+
+               if(sType === "create") {
+                  ePrevious.className = "button is-primary is-outlined mr-1";
+                  eNext.className = "button is-primary is-outlined";
+               }
+               else {
+                  const iPage = this.members.page;
+                  const iCount = this.members.page_count;
+                  const iMax = this.members.page_max_count;
+
+                  eCurrent.innerText = (iPage + 1).toString();
+
+                  if( iPage === 0 ) {
+                     ePrevious.disabled = true;
+                     ePrevious.innerText = self.GetLabel("previous");
+                  }
+                  else {
+                     ePrevious.disabled = false;
+                     ePrevious.innerText = self.GetLabel("previous") + " (" + (iPage) + ")";
+                  }
+                  
+                  if( iCount < iMax ) {
+                     eNext.disabled = true;
+                     eNext.innerText = self.GetLabel("next");   
+                  }
+                  else {
+                     eNext.disabled = false;
+                     eNext.innerText = self.GetLabel("next") + " (" + (iPage + 2) + ")";   
+                  }
+               }
+            }
+
+            return true;
+         }
+      });
+
+      return oPager;
    }
 
 

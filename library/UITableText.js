@@ -551,8 +551,9 @@ export class CUITableText {
             }
             return;
         }
-        let aHeader = this.data.COLUMNGetPropertyValue(true, ["alias", "name"], true, (column) => {
-            if (column.position.hide)
+        let aHeader = this.data.COLUMNGetPropertyValue(true, ["alias", "name", "position.header"], true, (column) => {
+            const o = column.position;
+            if (o.hide)
                 return false;
             return true;
         });
@@ -581,6 +582,8 @@ export class CUITableText {
             let j = aHeader.length;
             while (--j >= 0) {
                 if (iC === aHeader[j][0]) {
+                    if (aHeader[j][1][2] === 0)
+                        aHeader[j][1][2] = false;
                     a.push(aHeader[j]);
                     break;
                 }
@@ -1310,8 +1313,9 @@ export class CUITableText {
                     const iC = this._column_in_ui(aColumn[i]); // index to column in table data
                     let e = this.ELEMENTGetCellValue(eColumn); // get cell value element
                     let sValue = aRow[iC]; // value for active cell
-                    const oColumn = this.data.COLUMNGet(this._column_in_data(i), undefined, true);
-                    const callRenderer = this.COLUMNGetRenderer(i); // get renderer for cell if custom rendering
+                    //const oColumn = this.data.COLUMNGet( this._column_in_data( i ), undefined, true );
+                    const oColumn = this.data.COLUMNGet(aColumn[i], undefined, true); // get column information for current column that is to be rendered
+                    const callRenderer = this.COLUMNGetRenderer(iC); // get renderer for cell if custom rendering
                     if (bCall) {
                         let bRender = true;
                         for (let j = 0; j < this.m_acallRender.length; j++) {
@@ -1566,20 +1570,18 @@ export class CUITableText {
             let eParent = eComponent;
             let aSection = sName.split("."); // if section name is split with . then it is grouped, name before . creates div group
             if (aSection.length === 2) { // found group name ?
-                let sHtmlGroup = CTableData.GetPropertyValue(this.m_oStyle, false, "html_group") || "div";
-                let aGroup = sHtmlGroup.split("."), sClass;
-                if (aGroup.length > 1) {
-                    sHtmlGroup = aGroup[0];
-                    sClass = aGroup[1];
-                } // found class name in group element?
-                sName = aSection[1];
-                let sGroup = aSection[0]; // get group name
-                let eGroup = eComponent.querySelector(sHtmlGroup + "[data-group='" + sGroup + "']");
+                sName = aSection[1]; // !important - if section is split with . then the section name is the later (after ".""),
+                let _Group = CTableData.GetPropertyValue(this.m_oStyle, false, "html_group");
+                _Group = this._split(_Group, "div");
+                //const sGroup = aSection[ 0 ];                                      // get group name found in active section array
+                let eGroup = eComponent.querySelector(_Group[0] + "[data-group='" + aSection[0] + "']");
                 if (eGroup === null) { // is group not created ?
-                    eGroup = document.createElement(sHtmlGroup);
-                    if (sClass)
-                        eGroup.className = sClass;
-                    eGroup.dataset.group = sGroup;
+                    eGroup = document.createElement(_Group[0]);
+                    if (_Group.length > 1)
+                        eGroup.className = _Group[1];
+                    if (_Group.length > 2)
+                        eGroup.style.cssText = _Group[2];
+                    eGroup.dataset.group = aSection[0];
                     eParent.appendChild(eGroup); // add group to parent
                 }
                 eParent = eGroup; // group is parent to section
@@ -1621,7 +1623,7 @@ export class CUITableText {
                     let eSink;
                     if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") {
                         let oEdit = this.m_oEdits.GetEdit(e.target); // try to get edit object for edit element
-                        if (!oEdit || oEdit.IsMoveKey(e.keyCode) === false) {
+                        if (!oEdit || oEdit.IsMoveKey(e.keyCode, e) === false) {
                             return;
                         }
                         eSink = self.m_aInput[2];
@@ -1716,22 +1718,18 @@ export class CUITableText {
         let sClass;
         let iCount = aHeader.length;
         let _HtmlRow = CTableData.GetPropertyValue(this.m_oStyle, false, "html_row_header") || CTableData.GetPropertyValue(this.m_oStyle, false, "html_row") || "div";
-        let sStyle = CTableData.GetPropertyValue(this.m_oStyle, false, "header") || "";
-        let sHtml = CTableData.GetPropertyValue(this.m_oStyle, false, "html_cell_header");
-        if (!sHtml)
-            sHtml = "span";
-        else {
-            let a = sHtml.split(".");
-            if (a.length > 1)
-                [sHtml, sClass] = a;
-        }
+        let _Cell = CTableData.GetPropertyValue(this.m_oStyle, false, "html_cell_header");
+        _Cell = this._split(_Cell, "span");
         let aRow = this._create_row(_HtmlRow);
         aHeader.forEach((a, i) => {
-            let eSpan = document.createElement(sHtml);
-            eSpan.style.cssText = sStyle;
-            if (sClass)
-                eSpan.className = sClass;
-            aRow[1].appendChild(eSpan);
+            if (a[1][2] !== false) { // second value in aHeader has selected properties for column header (if third values is false that means that header isn't generated)
+                let eSpan = document.createElement(_Cell[0]);
+                if (_Cell.length > 1)
+                    eSpan.className = _Cell[1];
+                if (_Cell.length > 2)
+                    eSpan.style.cssText = _Cell[2];
+                aRow[1].appendChild(eSpan);
+            }
         });
         eSection.appendChild(aRow[0]);
         return eSection;
@@ -1749,27 +1747,34 @@ export class CUITableText {
         this.m_iRowCount = aBody.length; // set number of rows in body
         if (this.m_iRowCount === 0)
             return eSection; // no rows, just skip  creation
+        let split_item = (_item, sDefault) => {
+            if (!_item)
+                _item = sDefault;
+            else if (Array.isArray(_item)) {
+                let a = [];
+                _item.forEach(s => {
+                    a.push(this._split(s));
+                });
+                _item = a;
+            }
+            else if (_item.indexOf(".") !== -1) {
+                _item = this._split(_item);
+            }
+            return _item;
+        };
         //      let sClass: string;
         let sStyle = CTableData.GetPropertyValue(this.m_oStyle, false, "value") || null;
         let _HtmlRow = CTableData.GetPropertyValue(this.m_oStyle, false, "html_row_body") || CTableData.GetPropertyValue(this.m_oStyle, false, "html_row") || "div";
         let _HtmlBefore = CTableData.GetPropertyValue(this.m_oStyle, false, "html_row_body_before") || _HtmlRow;
         let _HtmlAfter = CTableData.GetPropertyValue(this.m_oStyle, false, "html_row_body_after") || _HtmlRow;
         let _HtmlContainer = CTableData.GetPropertyValue(this.m_oStyle, false, "html_row_body_container"); // if row is more than one row this could be used to group rows within container element
-        let _HtmlCell = CTableData.GetPropertyValue(this.m_oStyle, false, "html_cell") || "span"; // span is default for cell
+        let _HtmlCell = CTableData.GetPropertyValue(this.m_oStyle, false, "html_cell"); // span is default for cell
+        _HtmlCell = this._split(_HtmlCell, "span");
         //      let sHtmlCell: string = <string>CTableData.GetPropertyValue(this.m_oStyle, false, "html_cell") || "span"; // span is default for cell
         let sHtmlValue = CTableData.GetPropertyValue(this.m_oStyle, false, "html_value");
         if (typeof sHtmlValue === "string")
             sHtmlValue = sHtmlValue.trim();
         this.set_state(sHtmlValue, 1 /* HtmlValue */); // set state if cell is a dom tree or not
-        if (!_HtmlCell)
-            _HtmlCell = "span"; // span is default element for values
-        else if (Array.isArray(_HtmlCell)) {
-            let a = [];
-            _HtmlCell.forEach(s => {
-                a.push(s.split("."));
-            });
-            _HtmlCell = a;
-        }
         /*
               if(!sHtmlCell) sHtmlCell = "span";                                       // span is default element for values
               if( sHtmlCell.indexOf(".") !== -1 ) {
@@ -1804,7 +1809,7 @@ export class CUITableText {
                         }
                         else {
                             if (i === 0)
-                                eCell = document.createElement(a);
+                                e = eCell = document.createElement(a);
                             else if (i === 1)
                                 eCell.className = a;
                             else if (i === 2)
@@ -1892,12 +1897,15 @@ export class CUITableText {
             const sRow = aContainer[i].trim();
             if (sRow[0] === "<") { // markup template ?
             }
-            const a = aContainer[i].split(".");
+            const a = this._split(aContainer[i]); // aContainer[i].split(".");
             eRow = document.createElement(a[0]);
             if (eParent)
                 eParent.appendChild(eRow);
             if (a.length > 1) {
                 eRow.className = a[1];
+            }
+            if (a.length > 2) {
+                eRow.style.cssText = a[2];
             }
             if (eRoot === null) {
                 eRoot = eRow;
@@ -1916,12 +1924,15 @@ export class CUITableText {
             aRow = [aRow];
         let eRoot = null, eRow, eParent;
         for (let i = 0; i < aRow.length; i++) {
-            const a = aRow[i].split(".");
+            const a = this._split(aRow[i]); //   aRow[i].split(".");
             eRow = document.createElement(a[0]);
             if (eParent)
                 eParent.appendChild(eRow);
             if (a.length > 1) {
                 eRow.className = a[1];
+            }
+            if (a.length > 2) {
+                eRow.style.cssText = a[2];
             }
             if (eRoot === null) {
                 eRoot = eRow;
@@ -1962,12 +1973,16 @@ export class CUITableText {
                 }
             }
             else {
-                const a = row.split(".");
+                //const a = row.split(".");
+                const a = this._split(row);
                 eRow = document.createElement(a[0]);
                 if (eParent)
                     eParent.appendChild(eRow);
                 if (a.length > 1) {
                     eRow.className = a[1];
+                }
+                if (a.length > 2) {
+                    eRow.style.cssText = a[2];
                 }
                 if (eRoot === null) {
                     eRoot = eRow;
@@ -1990,20 +2005,23 @@ export class CUITableText {
      * @param {string | string[]} aRow element names for  row tree
      */
     _create_section(aSection, sName) {
-        if (!Array.isArray(aSection))
+        if (typeof aSection === "string")
             aSection = [aSection];
         let eRoot = null, eSection, eParent;
         for (let i = 0; i < aSection.length; i++) {
-            const a = aSection[i].split(".");
+            //const a = aSection[i].split(".");
+            const a = this._split(aSection[i], "div");
             eSection = document.createElement(a[0]);
             if (eParent)
                 eParent.appendChild(eSection);
             if (a.length > 1) {
                 eSection.className = a[1];
             }
+            if (a.length > 2) {
+                eSection.style.cssText = a[2];
+            }
             if (eRoot === null) {
-                eRoot = eSection;
-                eRoot.dataset.root = "1";
+                eSection.dataset.root = "1"; // Set first item as root item
             }
             eRoot = eSection;
             eRoot.dataset.widget = CUITableText.s_sWidgetName;
@@ -2183,6 +2201,33 @@ export class CUITableText {
                 }
             }
         }
+    }
+    /**
+     * Split element string before creating markup for t able
+     * @param  {string | string[]} _item element string to split
+     * @param  {string} sDefault default element name
+     * @return {string | string[]} prepared string or array of strings that is used to create markup
+     */
+    _split(_item, sDefault) {
+        if (!_item)
+            _item = sDefault;
+        else if (Array.isArray(_item)) {
+            let a = [];
+            _item.forEach(s => {
+                a.push(this._split(s));
+            });
+            _item = a;
+        }
+        else if (_item.indexOf(".") !== -1) {
+            let a = _item.split(/(?<!\\)\./);
+            a.forEach(function (s, i) {
+                this[i] = s.replaceAll("\\.", ".");
+            }, a);
+            _item = a;
+        }
+        if (typeof _item === "string")
+            _item = [_item];
+        return _item;
     }
     /**
      * Return index to physical position in table data. This is needed if operations based on data is executed

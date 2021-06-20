@@ -169,7 +169,7 @@ export class CD3Bar {
 
       eContainer.innerHTML = "";
 
-      const iWidthElement = eContainer.offsetWidth;
+      const iWidthElement = eContainer.offsetWidth;         console.assert( iWidthElement !== 0, "Bar container needs width" );
 
       let d3Svg = d3.select( eContainer )                   // create svg element
          .append('svg')
