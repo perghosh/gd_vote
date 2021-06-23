@@ -9,6 +9,7 @@ namespace details {
       callback_action?: ((sMessage: string, data: any) => void);
       state?: { [key_name: string]: string|number|boolean } // state items for page
       session?: string;
+      debug?: { debug: boolean, print: HTMLElement };
    }
 }
 
@@ -20,9 +21,11 @@ export class CApplication {
    m_sQueriesSet: string;
    m_oEditors: edit.CEditors;
    m_oRequest: CRequest;
+   m_oDebug: { debug: boolean, print: HTMLElement };
 
    constructor( oOptions?: details.application_construct ) {
       const o = oOptions || {};
+      this.m_oDebug = o.debug || null;
       this.m_callAction = o.callback_action || null;
       this.m_oEditors = <edit.CEditors>edit.CEditors.GetInstance();
       // Initialize CRequest for server communication
@@ -44,6 +47,8 @@ export class CApplication {
    }
 
    get alias() { return this.m_sAlias; }
+   get debug() { return this.m_oDebug; }
+   set debug( o: {debug: boolean, print: HTMLElement}) { this.m_oDebug = o; }
    get request() { return this.m_oRequest; }
    get session() { return this.m_oRequest.session; }
    get page() { return this.m_oPage; }

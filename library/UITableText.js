@@ -2239,6 +2239,8 @@ export class CUITableText {
      * @param iIndex
      */
     _column_in_ui(iIndex) {
+        if (!this.m_aColumnPhysicalIndex || this.m_aColumnPhysicalIndex.length === 0)
+            this._generate_physicalindex();
         if (this.m_aColumnPhysicalIndex) {
             let i = this.m_aColumnPhysicalIndex.length;
             while (--i >= 0) {
@@ -2248,6 +2250,19 @@ export class CUITableText {
             return -1;
         }
         return iIndex;
+    }
+    /**
+     * Generate index to physical position in table data where to column that  value is placed in ui table
+     */
+    _generate_physicalindex() {
+        this.m_aColumnPhysicalIndex = [];
+        let aPosition = this.data.COLUMNGetPropertyValue(true, "position", true);
+        aPosition.forEach(aP => {
+            // if column isn,t hidden then add to physical index
+            if (!aP[1].hide) {
+                this.m_aColumnPhysicalIndex.push(aP[0]);
+            }
+        });
     }
     _get_triggerdata() {
         let o = { dataUI: this, data: this.data };

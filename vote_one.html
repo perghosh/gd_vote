@@ -38,6 +38,7 @@
             </div>         
          </div>
       </div>
+      <div id="idDebugMessage"></div>
 
 
 <!--
@@ -99,7 +100,7 @@ JS: SetActiveState is used to switch state in page
             <article class="panel has-background-white" data-section="link" style="display: none; margin-top: 1em; padding: 5px;">
                <p class="panel-heading" data-translate="page.titlelinks">Länkar</p>
             </article>               
-            <article class="panel has-background-white" data-section="comment" style="margin-top: 1em; padding: 5px;">
+            <article class="content panel has-background-white" data-section="comment" style="margin-top: 1em; padding: 5px;">
                <p class="panel-heading" data-translate="page.comment">Kommentarer</p>
             </article>               
          </div>
@@ -126,6 +127,18 @@ JS: SetActiveState is used to switch state in page
             // 
             const sQueryString = window.location.search;
             const oParams = new URLSearchParams(sQueryString);
+            if(oParams.has("debug") === true) {
+               this.state.debug = true;
+               window.app.debug = { debug: true, print: document.getElementById("idDebugMessage") };
+               if( this.state?.debug ) {
+                  const sSession = window.app.session;
+                  const sAlias = window.app.alias;
+                  let s = `session: ${sSession}, alias: ${sAlias}`;
+                  window.app.debug.print.innerText = s;
+               }
+            }
+
+
             if(oParams.has("poll") === false) {
                this.OpenMessage("Saknar id till aktiv fråga");
                return;
@@ -157,8 +170,6 @@ JS: SetActiveState is used to switch state in page
                const sSession = window.app.request.session;
                const sAlias = window.app.alias;
                CPageOne.HISTORYSerializeSession( true, sSession, sAlias );
-
-               //this.m_oPage.SetActivePoll( 26 );
             }
          }
          else if(sOperation === "select-poll") {

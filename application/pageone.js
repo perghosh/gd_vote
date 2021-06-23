@@ -34,7 +34,7 @@ pageone = page logic for managing one vote, user can not select any votes. activ
 | RESULTCreatePollHashtags |  |
 | CONDITIONMarkFilterVote |  Mark items that has been filtered |
 | WalkNextState | Walks queries used to collect information for active state |
-| PAGECreateToolbarForSearch | Walks queries used to collect information for active state |
+| PAGECreateToolbarFor | Create toolbar for query results. Walks queries used to collect information for active state |
 | TRANSLATEPage | Translate page elements |
 | GENERATEPager | Generate pager for results shown i table |
 
@@ -89,14 +89,18 @@ export class CPageOne extends CPageSuper {
         this.m_oLabel = {
             "add_filter": "Visa röster för",
             "comment": "Kommentar",
+            "comments": "Kommentarer",
+            "comment_snapshots": "all,Alla|today,Idag|week,Senaste 7 dagar|month,Senaste 30 dagar",
             "next": "Nästa",
             "previous": "Föregående",
             "remove_filter": "Ta bort visning för",
-            "vote": "RÖSTA",
-            "vote_exist": "Röst är registrerad för aktuell fråga.",
             "filter_headers": "Fråga|Svar|Antal röster",
             "search_headers": "Namn|Beskrivning|Start|Slut",
-            "search_snapshots": "all,Alla|yesno,Aktiva Ja/Nej frågor|active,Aktiva"
+            "search_snapshots": "all,Alla|yesno,Aktiva Ja/Nej frågor|active,Aktiva",
+            "vote": "RÖSTA",
+            "vote_error": "Felaktiga värden. Kommentar får max vara 500 tecken.",
+            "vote_exist": "Röst är registrerad för aktuell fråga.",
+            "vote_registered": "Din röst har blivit registrerad!"
         };
         if (o.label) {
             Object.assign(this.m_oLabel, o.label);
@@ -338,6 +342,7 @@ export class CPageOne extends CPageSuper {
         console.assert(this.GetActivePoll() > 0, "Active poll isn't set.");
         console.assert(this.IsReadyToVote(), "Trying to send vote to server but vote isn't ready to be sent.");
         let aValue = [];
+        let aErrorText = [];
         // ## Extract key values from, values for poll is found i page state body.vote
         const aTD = this.GetPageState("body", "vote").GetTableData();
         aTD.forEach(oTD => {
@@ -348,10 +353,20 @@ export class CPageOne extends CPageSuper {
                     { index: 2, value: oTD.CELLGetValue(iRowKey, "PollAnswerK") },
                     { name: "FComment", value: oTD.CELLGetValue(iRowKey, "FComment") } // vote key
                 ];
+                if (a[1].value) {
+                    const _result = CTableData.ValidateValue(a[1].value, oTD.COLUMNGet("FComment"));
+                    if (_result !== true) {
+                        aErrorText.push(a[1].value);
+                    }
+                }
                 aValue.push(a); // column with index 2 gets key to answer
-                //aValue.push({ index: 6, value: oTD.CELLGetValue(iRowKey, "FComment") }); 
             });
         });
+        if (aErrorText.length > 0) {
+            const sError = "<b>" + this.GetLabel("vote_error") + "</b>\n<hr>" + aErrorText.join("<hr>\n");
+            this.OpenMessage(sError, "warning", true);
+            return;
+        }
         let aHeader = [{ name: "PollK", value: this.GetActivePoll() }];
         if (this.m_aVoter[0] !== -1) {
             aHeader.push({ name: "VoterK", value: this.m_aVoter[0] });
@@ -466,7 +481,7 @@ export class CPageOne extends CPageSuper {
                 if (sType === "add_rows") {
                     const sQueryName = oResult.name;
                     if (sQueryName === "poll_vote") {
-                        this.OpenMessage("Din röst har blivit registrerad!");
+                        this.OpenMessage(this.GetLabel("vote_registered"));
                         if (this.poll.vote > 0) {
                             this.m_aVoteHistory.push(this.poll.vote);
                             this.HISTORYSerialize(true);
@@ -483,7 +498,10 @@ export class CPageOne extends CPageSuper {
                 let iPosition = sName.indexOf("get_query_information-");
                 if (iPosition === 0) {
                     if (oResult.name === "poll_search") {
-                        this.PAGECreateToolbarForSearch(oResult);
+                        this.PAGECreateToolbarFor(oResult, this.m_oUITableText.poll_search, "search_snapshots");
+                    }
+                    else if (oResult.name === "poll_vote_comment") {
+                        this.PAGECreateToolbarFor(oResult, this.m_oUITableText.poll_vote_comments, "comment_snapshots");
                     }
                 }
             }
@@ -542,6 +560,7 @@ export class CPageOne extends CPageSuper {
             conditions: [{ table: "TPoll1", id: "PollK", value: iPoll }]
         });
         let sXml = oQuery.CONDITIONGetXml();
+        sCommand += "add_condition_to_query";
         if (oCondition) {
             const iStart = oCondition.start || 0;
             oCommand.start = iStart;
@@ -593,11 +612,16 @@ export class CPageOne extends CPageSuper {
         this.m_bFilterConditionCount = false;
         request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", hint: sQuery, json: request.GetJson(oCommand) }, sXml);
     }
-    QUERYGetSearch(oCondition) {
+    /**
+     * [QUERYGetSearch description]
+     * @param {number }}   oCondition    [description]
+     * @param {string}    sQuery [description]
+     */
+    QUERYGetSearch(oCondition, sQuery) {
         const iStart = oCondition.start || 0;
         let request = this.app.request;
         let sCommand = "";
-        let oCommand = { query: "poll_search", set: this.queries_set, count: 10, format: 1, start: iStart };
+        let oCommand = { query: sQuery, set: this.queries_set, count: 10, format: 1, start: iStart };
         if (oCondition.snapshot) {
             oCommand.name = oCondition.snapshot;
             sCommand += " set_snapshot";
@@ -609,7 +633,7 @@ export class CPageOne extends CPageSuper {
         }
         sCommand += " get_result";
         oCommand.command = sCommand;
-        request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", hint: "poll_search", json: request.GetJson(oCommand) });
+        request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", hint: sQuery, json: request.GetJson(oCommand) });
     }
     /**
      * Get hashtags to filter votes
@@ -784,6 +808,7 @@ export class CPageOne extends CPageSuper {
             CTableData.SetPropertyValue(aColumn, true, "edit.element", 1);
             CTableData.SetPropertyValue(aColumn, true, "position.header", 0);
             CTableData.SetPropertyValue(aColumn, true, "style", { minHeight: "3em", overflowX: "auto" });
+            CTableData.SetPropertyValue(aColumn, true, "format.max", 500);
         }
         TDVote.COLUMNUpdatePositionIndex();
         // ## Find container element to question
@@ -928,7 +953,8 @@ export class CPageOne extends CPageSuper {
         oTD = new CTableData({ id: oResult.id, name: oResult.name });
         CPageSuper.ReadColumnInformationFromHeader(oTD, oResult.table.header);
         oTD.ReadArray(oResult.table.body, { begin: 0 });
-        oTD.COLUMNSetPropertyValue(["ID", "Ip"], "position.hide", true);
+        oTD.COLUMNSetPropertyValue(["ID", "Ip", "Date", "Answer"], "position.hide", true);
+        oTD.COLUMNSetPropertyValue("FComment", "alias", this.GetLabel("comments"));
         // eArticle.innerHTML = marked( sArticle );
         let oStyle = {
             html_group: "table.table is-narrow is-fullwidth pointer",
@@ -938,6 +964,33 @@ export class CPageOne extends CPageSuper {
             html_section_header: "thead",
             html_section_body: "tbody",
         };
+        // trigger logic, this will enable triggering callbacks when CUITableText call methods in CTableData
+        let oTrigger = new CTableDataTrigger({ table: oTD, trigger: (oEventData, v) => {
+                if (oEventData.iEventAll === 131085 /* AfterSelect */) { // cell is selected
+                    // try to get the poll id for row
+                    const a = oEventData.information;
+                    if (a[0] === -1)
+                        return; // -1 = no selected
+                    const iRowData = a[3]; // index 3 has index to row that is clicked
+                    // Get poll id from table data for requested row
+                    const oTD = oEventData.data; // get table data
+                    const iPoll = oTD.CELLGetValue(iRowData, "PollK"); // get key to poll
+                    this.SetActiveState("body.select");
+                    this.SetActivePoll(iPoll); // activate poll
+                }
+                else if (oEventData.iEventAll === 65560 /* BeforeMove */) {
+                    const o = oEventData.information;
+                    // ## QUERYGetSearch is used to get search data from server
+                    const iMoveTo = o.start + o.offset; // row that we are going to move to
+                    if (o.offset < 0 && iMoveTo >= 0) { // If offset is negative that means we move backwards
+                        this.QUERYGetSearch({ start: iMoveTo > 0 ? iMoveTo : 0 }, "poll_vote_comment"); // Can't move to negative row
+                    }
+                    else if (o.offset > 0 && o.count === o.max) {
+                        this.QUERYGetSearch({ start: iMoveTo }, "poll_vote_comment");
+                    }
+                    return false; // get new result from server, no internal update return false to cancel command
+                }
+            } });
         let oDispatch = new CDispatch(); // Dispatcher that manages communication between pager and ui table
         let options = {
             dispatch: oDispatch,
@@ -947,40 +1000,45 @@ export class CPageOne extends CPageSuper {
             server: true,
             style: oStyle,
             table: oTD,
-            callback_action: function (sType, e, sSection) {
-                if (sType === "click" && sSection === "header") {
-                    let eElement = e.eElement || e.eEvent.srcElement;
-                    const aColumn = this.COLUMNGet(eElement);
-                    if (aColumn) {
-                        const oColumn = aColumn[1]; // get column object for table data
-                        let iIndex = aColumn[0] + 1; // one based index when sort is set
-                        let iSort = oColumn.state?.sorted;
-                        if (iSort === 1)
-                            iIndex = -iIndex;
-                        self.QUERYGetPollOverviewVoteComments(undefined, { index: iIndex });
-                    }
-                }
-            },
-            callback_render: function (sType, e, sSection, oColumn) {
-                if (sType === "afterHeaderValue") {
-                    e.eElement.style.cursor = "pointer"; // change cursor
-                    let iSort = oColumn.state?.sorted;
-                    if (iSort) {
-                        let eI = document.createElement("i");
-                        eI.style.paddingLeft = ".3em";
-                        if (iSort === 1)
-                            eI.className = "fas fa-sort-up";
-                        else
-                            eI.className = "fas fa-sort-down";
-                        e.eElement.appendChild(eI);
-                        e.eElement.style.whiteSpace = "nowrap";
-                    }
-                }
+            trigger: oTrigger
+            /*
+            ,callback_action: function(sType: string, e: EventDataTable, sSection: string) {
+               if(sType === "click" && sSection === "header") {
+                  let eElement = e.eElement || e.eEvent.srcElement;
+                  const aColumn = this.COLUMNGet(eElement);
+                  if( aColumn ) {
+                     const oColumn = aColumn[1]; // get column object for table data
+                     let iIndex = aColumn[0] + 1; // one based index when sort is set
+                     let iSort = oColumn.state?.sorted;
+                     if( iSort === 1 ) iIndex = -iIndex;
+   
+                     self.QUERYGetPollOverviewVoteComments( undefined, { index: iIndex });
+                  }
+               }
             }
+            */
+            /*, callback_render: function( sType: string, e: EventDataTable, sSection: string, oColumn: any ) {
+               if( sType === "afterHeaderValue" ) {
+                  e.eElement.style.cursor = "pointer";         // change cursor
+                  let iSort = oColumn.state?.sorted;
+                  if( iSort ) {
+                     let eI = document.createElement("i");
+                     eI.style.paddingLeft = ".3em";
+                     if( iSort === 1 ) eI.className = "fas fa-sort-up";
+                     else eI.className = "fas fa-sort-down";
+                     e.eElement.appendChild(eI);
+                     e.eElement.style.whiteSpace = "nowrap";
+                  }
+               }
+            }*/
         };
         oTT = new CUITableText(options);
         oTD.UIAppend(oTT);
+        oTT.COLUMNSetRenderer("Comment", (eCell, value, a) => {
+            eCell.innerHTML = marked(value);
+        });
         oTT.Render();
+        this.SNAPSHOTGetFor("poll_vote_comment");
         this.m_oUITableText.poll_vote_comments = oTT;
         eRoot.dataset.one = "1"; // You do not need to fill this again
     }
@@ -1369,10 +1427,10 @@ export class CPageOne extends CPageSuper {
                     // ## QUERYGetSearch is used to get search data from server
                     const iMoveTo = o.start + o.offset; // row that we are going to move to
                     if (o.offset < 0 && iMoveTo >= 0) { // If offset is negative that means we move backwards
-                        this.QUERYGetSearch({ start: iMoveTo > 0 ? iMoveTo : 0 }); // Can't move to negative row
+                        this.QUERYGetSearch({ start: iMoveTo > 0 ? iMoveTo : 0 }, "poll_search"); // Can't move to negative row
                     }
                     else if (o.offset > 0 && o.count === o.max) {
-                        this.QUERYGetSearch({ start: iMoveTo });
+                        this.QUERYGetSearch({ start: iMoveTo }, "poll_search");
                     }
                     return false; // get new result from server, no internal update return false to cancel command
                 }
@@ -1398,7 +1456,7 @@ export class CPageOne extends CPageSuper {
                         let iSort = oColumn.state?.sorted;
                         if (iSort === 1)
                             iIndex = -iIndex;
-                        self.QUERYGetSearch({ index: iIndex });
+                        self.QUERYGetSearch({ index: iIndex }, "poll_search");
                     }
                 }
             },
@@ -1584,8 +1642,8 @@ export class CPageOne extends CPageSuper {
      *
      * @param {any} oResult query data that contains snapshot information
      */
-    PAGECreateToolbarForSearch(oResult) {
-        let oTT = this.m_oUITableText.poll_search;
+    PAGECreateToolbarFor(oResult, oTT, sSnapshotNames) {
+        //let oTT = this.m_oUITableText.poll_search;
         let eToolbar = oTT.GetSection("toolbar");
         let eDiv = document.createElement("div");
         eDiv.dataset.container = "hashtag";
@@ -1600,7 +1658,7 @@ export class CPageOne extends CPageSuper {
         eToolbar.appendChild(eToolbarCommand);
         eToolbarCommand.style.display = "flex";
         let oSnapshot = {};
-        const aSnapshot = this.GetLabel("search_snapshots").split("|");
+        const aSnapshot = this.GetLabel(sSnapshotNames).split("|");
         aSnapshot.forEach(a => {
             const aPair = a.split(",");
             oSnapshot[aPair[0]] = aPair[1];
@@ -1632,82 +1690,34 @@ export class CPageOne extends CPageSuper {
             eToolbarCommand.appendChild(eDiv);
             eSelect.addEventListener("change", e => {
                 const sSnapshot = e.srcElement.value;
-                this.QUERYGetSearch({ snapshot: sSnapshot });
+                this.QUERYGetSearch({ snapshot: sSnapshot }, oResult.name);
             });
         }
         //
         // ## Hashtag filter
         //
         {
+            /*
             let eButton = document.createElement("button");
             eButton.className = "button is-primary is-outlined ml-1";
             eButton.innerText = "#";
-            eToolbarCommand.appendChild(eButton);
-            eButton.addEventListener("click", e => {
-                this.QUERYGetHashtags();
+            eToolbarCommand.appendChild( eButton );
+            eButton.addEventListener( "click", e => {
+               this.QUERYGetHashtags();
             });
+            */
         }
         //
         // ## Create pager
         //
         {
-            let oDispatch = this.m_oUITableText.poll_search.dispatch;
+            let oDispatch = oTT.dispatch;
             let oTD = oTT ? oTT.data : null;
             let eContainer = document.createElement("div");
             eContainer.style.display = "inline-block";
             eContainer.style.marginLeft = "auto";
             eToolbarCommand.appendChild(eContainer); // add container to toolbar
             let oPager = this.GENERATEPager(eContainer, oTT, oDispatch);
-            /*
-                     const self = this;
-                     let oPager = new CUIPagerPreviousNext({
-                        dispatch: oDispatch, // dispatcher used to communicate with ui table
-                        members: { page_max_count: 10, page_count: oTT.ROWGetCount() }, // configure page sections, how many rows each page has
-                        parent: eContainer,
-                        style: { html_page_current: "span.button is-static is-primary is-outlined mr-1" },
-                        callback_action: function (sAction, e): boolean {
-                           const [sType, sItem] = sAction.split(".");
-                           if(sType === "render" || sType === "create") {
-                              let eComponent = e.eElement;
-                              let ePrevious = <HTMLButtonElement>eComponent.querySelector('[data-type="previous"]');
-                              let eCurrent = <HTMLButtonElement>eComponent.querySelector('[data-type="current"]');
-                              let eNext = <HTMLButtonElement>eComponent.querySelector('[data-type="next"]');
-            
-                              if(sType === "create") {
-                                 ePrevious.className = "button is-primary is-outlined mr-1";
-                                 eNext.className = "button is-primary is-outlined";
-                              }
-                              else {
-                                 const iPage = this.members.page;
-                                 const iCount = this.members.page_count;
-                                 const iMax = this.members.page_max_count;
-            
-                                 eCurrent.innerText = (iPage + 1).toString();
-            
-                                 if( iPage === 0 ) {
-                                    ePrevious.disabled = true;
-                                    ePrevious.innerText = self.GetLabel("previous");
-                                 }
-                                 else {
-                                    ePrevious.disabled = false;
-                                    ePrevious.innerText = self.GetLabel("previous") + " (" + (iPage) + ")";
-                                 }
-                                 
-                                 if( iCount < iMax ) {
-                                    eNext.disabled = true;
-                                    eNext.innerText = self.GetLabel("next");
-                                 }
-                                 else {
-                                    eNext.disabled = false;
-                                    eNext.innerText = self.GetLabel("next") + " (" + (iPage + 2) + ")";
-                                 }
-                              }
-                           }
-            
-                           return true;
-                        }
-                     });
-            */
             oDispatch.AddChain(oPager, oTT); // connect pager with ui table
             oDispatch.AddChain(oTT, [oPager]); // connect ui table with pager
         }

@@ -4,6 +4,7 @@ import { CPageOne } from "./pageone.js";
 export class CApplication {
     constructor(oOptions) {
         const o = oOptions || {};
+        this.m_oDebug = o.debug || null;
         this.m_callAction = o.callback_action || null;
         this.m_oEditors = edit.CEditors.GetInstance();
         // Initialize CRequest for server communication
@@ -23,6 +24,8 @@ export class CApplication {
         }
     }
     get alias() { return this.m_sAlias; }
+    get debug() { return this.m_oDebug; }
+    set debug(o) { this.m_oDebug = o; }
     get request() { return this.m_oRequest; }
     get session() { return this.m_oRequest.session; }
     get page() { return this.m_oPage; }

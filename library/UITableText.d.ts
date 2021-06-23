@@ -531,6 +531,10 @@ export declare class CUITableText implements IUITableData {
      * @param iIndex
      */
     private _column_in_ui;
+    /**
+     * Generate index to physical position in table data where to column that  value is placed in ui table
+     */
+    private _generate_physicalindex;
     private _get_triggerdata;
     private _set_selected;
     private _row_in_data;

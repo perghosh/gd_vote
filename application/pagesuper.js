@@ -28,8 +28,10 @@ export class CPageSuper {
         sType = sType || "message";
         let e = this.m_oElement[sType];
         e = e.querySelector("p, pre");
-        if (bHtml === true)
+        if (bHtml === true) {
+            sMessage = sMessage.replaceAll("\n", "<br>");
             e.innerHTML = sMessage;
+        }
         else
             e.textContent = sMessage;
         e.closest("[data-message]").style.display = "block";

@@ -78,7 +78,10 @@ export class CPageSuper {
       sType = sType || "message";
       let e = this.m_oElement[sType];
       e = e.querySelector("p, pre");
-      if( bHtml === true ) e.innerHTML = sMessage;
+      if( bHtml === true ) {
+         sMessage = sMessage.replaceAll("\n", "<br>");
+         e.innerHTML = sMessage;
+      }
       else e.textContent = sMessage;
       (<HTMLElement>e.closest("[data-message]")).style.display = "block";
       window.scrollTo(0,0);
