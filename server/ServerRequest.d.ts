@@ -67,7 +67,14 @@ export declare class CRequest {
     GetJson(oJson: {
         [key: string]: string | number;
     }): string;
-    Load(sFile: string, sMimeType: string, sName?: string): void;
+    /**
+     * Load file from server
+     * @param {string} sFile     file name to load
+     * @param {string} sMimeType type of file
+     * @param {string} [sName]     operation name to know what to do
+     * @param {boolean} [bAsynchronous] if true then operation is asynchronous, false and it is synchronous
+     */
+    Load(sFile: string, sMimeType: string, sName?: string, bAsynchronous?: boolean): void;
     /**
      * Call server method or methods.
      * @param {string}    sMethod Server method or methods that is  called

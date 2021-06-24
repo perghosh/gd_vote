@@ -1203,10 +1203,22 @@ export class CPageOne extends CPageSuper {
 
       oTT = new CUITableText(options);
       oTD.UIAppend(oTT);
-
+/*
       oTT.COLUMNSetRenderer("Comment", (eCell, value, a) => {
          eCell.innerHTML = marked( value );
       });
+*/      
+
+      oTT.COLUMNSetRenderer("Comment", function(eCell, value, a) {
+         const iRow = a[0][0];
+         const sDate = this.data.CELLGetValue( iRow, "Date" );
+         const sAnswer = this.data.CELLGetValue( iRow, "Answer" );
+         eCell.innerHTML = `<div class="has-text-grey is-pulled-right" style="font-size: 80%;"><span style="margin-right: 0.5em;">${sDate}</span><span class="has-text-info" data-answer></span></div><div></div>`;
+         eCell.querySelector("[data-answer]").textContent = sAnswer;
+         (<HTMLElement>eCell.firstElementChild).nextElementSibling.innerHTML = marked( value );
+         //eCell.innerHTML = marked( value );
+      });
+
 
 
       oTT.Render();

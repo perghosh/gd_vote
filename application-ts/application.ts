@@ -136,7 +136,7 @@ export class CApplication {
       else if( sMethod === "alias" ) {
          oApplication.m_sAlias = e.sResponseText;
       }
-      else if( sMethod === "set-language" ) {
+      else if( sMethod === "set-language" || sMethod === "js" ) {
          oApplication.CallOwner(sMethod, e);
       }
    }

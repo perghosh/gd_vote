@@ -113,6 +113,11 @@ JS: SetActiveState is used to switch state in page
       function PAGE_Setup() {
          const [sSession,sAlias] = CPageOne.HISTORYSerializeSession( false );
          window.app = new CApplication({ callback_action: PAGE_Callback, session: sSession, alias: sAlias });
+
+         if( !window.URLSearchParams ) {
+            window.app.request.Load("external_library/url-search-params.js", "text/javascript", "js", false);
+         }
+
          window.app.Initialize();
       }
 
@@ -195,6 +200,11 @@ JS: SetActiveState is used to switch state in page
          else if( sOperation === "set-language" ) {
             const oLanguage = JSON.parse( data.sResponseText );
             window.app.page.TRANSLATEPage( oLanguage );
+         }
+         else if( sOperation === "js" ) {
+            let eScript = document.createElement('script');
+            eScript.innerHTML = data.sResponseText;
+            document.body.appendChild(eScript);
          }
       }
 
@@ -295,7 +305,6 @@ JS: SetActiveState is used to switch state in page
    <script type="module">
       // #region LOAD_PAGE_COMPONENETS
 
-
       import { edit } from "./library/TableDataEdit.js";
       import { CTableData, browser } from "./library/TableData.js";
       import { CTableDataTrigger } from "./library/TableDataTrigger.js";
@@ -311,6 +320,7 @@ JS: SetActiveState is used to switch state in page
       import { CPageOne } from "./application/pageone.js";
       
 
+      //window.URLSearchParamsss = URLSearchParamsss;
 
       window.edit = edit;
       window.CTableData = CTableData;
