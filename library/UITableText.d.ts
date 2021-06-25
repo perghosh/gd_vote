@@ -532,7 +532,8 @@ export declare class CUITableText implements IUITableData {
      */
     private _column_in_ui;
     /**
-     * Generate index to physical position in table data where to column that  value is placed in ui table
+     * Generate index to physical position in table data where to column that value is placed in ui table.
+     * Check if column is hidden, if hide is set then column is ignored in ui table
      */
     private _generate_physicalindex;
     private _get_triggerdata;

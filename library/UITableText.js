@@ -2219,10 +2219,18 @@ export class CUITableText {
             _item = a;
         }
         else if (_item.indexOf(".") !== -1) {
-            let a = _item.split(/(?<!\\)\./);
-            a.forEach(function (s, i) {
-                this[i] = s.replaceAll("\\.", ".");
-            }, a);
+            let bReplace = false;
+            if (_item.indexOf("\\.") !== -1) {
+                _item = _item.replaceAll("\\.", "$£%½");
+                bReplace = true;
+            }
+            let a = _item.split(".");
+            if (bReplace === true) {
+                let i = a.length;
+                while (--i >= 0) {
+                    a[i] = a[i].replaceAll("$£%½", ".");
+                }
+            }
             _item = a;
         }
         if (typeof _item === "string")
@@ -2252,7 +2260,8 @@ export class CUITableText {
         return iIndex;
     }
     /**
-     * Generate index to physical position in table data where to column that  value is placed in ui table
+     * Generate index to physical position in table data where to column that value is placed in ui table.
+     * Check if column is hidden, if hide is set then column is ignored in ui table
      */
     _generate_physicalindex() {
         this.m_aColumnPhysicalIndex = [];
