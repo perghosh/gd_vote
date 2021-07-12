@@ -7,12 +7,21 @@
       "votecountlist": "Vote count for answers in poll "
    },
    "add_filter": "Select votes",
+   "comment": "Comment",
+   "comment_in_edit": "Comment (not required, max 500 characters and not to short)",
+   "comment_snapshots": "all,All|today,Today|week,Latest 7 days|month,Latest 30 days",
+   "comments": "Comments",
    "next": "Next",
    "previous": "Previous",
    "remove_filter": "Unselect votes",
-   "vote": "VOTE",
-   "vote_exist": "Vote is registered for the current poll",
    "filter_headers": "Question|Answer|Vote count",
+   "poll_not_found": "Selected poll wasn't found",
    "search_headers": "Name|Description|Begin|End",
-   "search_snapshots": "all,All|yesno,Active Yes/No polls|active,Active"
+   "search_snapshots": "all,All|yesno,Active Yes/No polls|active,Active",
+   "vote": "VOTE",
+   "vote_error": "Value error. Max size for comments are 500 characters and not too short",
+   "vote_exist": "Vote is registered for the current poll",
+   "vote_headers": "Vote|Option|Description",
+   "vote_registered": "Your vote is registered!"
+
 }

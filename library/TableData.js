@@ -137,9 +137,21 @@ export class CTableData {
         for (const [sKey, _rule] of Object.entries(oFormat)) {
             switch (sKey) {
                 case "max":
-                    if (((eType & 262144 /* group_string */) && typeof _Value === "string" && _Value.length > _rule) ||
-                        ((eType & 65536 /* group_number */) && typeof _Value === "number" && _Value > _rule))
-                        aError = [false, sKey];
+                    if (eType & 262144 /* group_string */) {
+                        if (_Value.toString().length > _rule)
+                            aError = [false, sKey];
+                    }
+                    else if (eType & 65536 /* group_number */) {
+                        let i;
+                        if (typeof _Value === "string")
+                            i = parseInt(_Value, 10);
+                        else if (typeof _Value === "boolean")
+                            i = _Value ? 1 : 0;
+                        else
+                            i = _Value;
+                        if (i > _rule)
+                            aError = [false, sKey];
+                    }
                     break;
                 case "min":
                     if (eType & 262144 /* group_string */) {
@@ -1085,11 +1097,14 @@ export class CTableData {
      * @param  {number} iRow index for row in source array
      * @param  {number|string} _Column index or key to column value
      * @param  {number} [iFormat] if raw value cell value from raw row is returned
+     * @param  {unknown} [_Default] default value if no cell value found
      */
-    CELLGetValue(iRow, _Column, iFormat) {
+    CELLGetValue(iRow, _Column, iFormat, _Default) {
         iFormat = iFormat || 2 /* Format */;
         let _V;
         let [iR, iC] = this._get_cell_coords(iRow, _Column, (iFormat & 1 /* Raw */) === 1 /* Raw */); // iR = row index, iC = column index
+        if (iC === -1 || typeof iC !== "number")
+            return _Default; // no column
         let aRow = this.m_aBody[iR];
         if (Array.isArray(aRow[iC])) {
             if (!(4 /* All */ & iFormat))
@@ -1107,6 +1122,90 @@ export class CTableData {
             }
         }
         return _V;
+    }
+    CELLGetRangeValue(_1, _2) {
+        let aIndex = [];
+        let aData = [];
+        let aRow; // active row
+        let iR1, iR2; // start and end row
+        let aColumn = []; // physical position in row for value
+        let aGetRow; // convert row keys to physical positions
+        if (_1 === undefined) { // first argument is undefined, return all rows
+            iR1 = this.m_iHeaderSize;
+            iR2 = this.ROWGetCount();
+        }
+        else if (typeof _1 === "number") { // selected row
+            aGetRow = [this._row(_1)];
+            iR1 = 0;
+            iR2 = 1;
+        }
+        else if (Array.isArray(_1)) { // [row1,col1,row2,col2] or [[row1,col1], [row2,col2]]
+            if (_2 !== undefined) {
+                aGetRow = [];
+                _1.forEach(iR => {
+                    const i = this._row(iR);
+                    if (i !== -1)
+                        aGetRow.push(i);
+                });
+                iR1 = 0;
+                iR2 = aGetRow.length;
+            }
+            else {
+                let _C1, _C2;
+                if (Array.isArray(_1[0])) {
+                    iR1 = _1[0][0];
+                    iR2 = _1[1][0];
+                    _C1 = _1[0][1];
+                    _C2 = _1[1][1];
+                }
+                else {
+                    iR1 = _1[0];
+                    iR2 = _1[2];
+                    _C1 = _1[1];
+                    _C2 = _1[3];
+                }
+                let iC1 = this._index2(_C1);
+                let iC2 = iC1;
+                _C2 = _C2 || iC1;
+                if (_C2 !== iC1) {
+                    iC2 = this._index2(_C2);
+                }
+                aColumn.push(iC1);
+                if (iC1 != iC2) {
+                    for (let i = iC1; i < iC2; i++)
+                        aColumn.push(this._index2(i));
+                }
+            }
+        }
+        if (aColumn.length === 0) {
+            if (typeof _2 === "number") {
+                aColumn.push(this._index(_2));
+            }
+            else if (typeof _2 === "string") {
+                aColumn.push(this._index(_2));
+            }
+            else if (Array.isArray(_2)) {
+                _2.forEach(i => { aColumn.push(this._index(i)); });
+            }
+        }
+        for (let iR = iR1; iR < iR2; iR++) {
+            // get row
+            if (aGetRow)
+                aRow = this.m_aBody[aGetRow[iR]]; // row keys has been converted to physical row
+            else
+                aRow = this.m_aBody[iR]; // raw row position
+            let aRowCollect = [];
+            aColumn.forEach(iC => {
+                const value = aRow[iC];
+                if (Array.isArray(value))
+                    aRowCollect.push(value[0]);
+                else
+                    aRowCollect.push(value);
+            });
+            aIndex.push(aRow[0]); // push physical index for row
+            aData.push(aRowCollect);
+        }
+        return [aData, aIndex];
     }
     CELLSetValue(_Row, _Column, value, bRaw) {
         if (Array.isArray(_Row) && _Row.length === 2) {
@@ -1345,7 +1444,7 @@ export class CTableData {
             }
         }
         else {
-            const iWhere = this._index(_Where) + 1; // remember to add 1 because first value is internal key value for row
+            const iWhere = this._index2(_Where);
             while (--i >= 0) {
                 let aRow = this.m_aBody[i];
                 if (iCount === 1)
@@ -1506,9 +1605,9 @@ export class CTableData {
     }
     */
     /**
-     *
-     * @param iCount
-     * @param oColumn
+     * Create column objects needed to store information about column data in table
+     * @param iCount {number} number of columns
+     * @param oColumn {details.column} column properties
      */
     _create_column(iCount, oColumn) {
         iCount = iCount || 1;
@@ -1565,6 +1664,15 @@ export class CTableData {
         return -1;
     }
     /**
+     * Return column index for column i body data (first value is key to row)
+     * @param {number|string} _Index index that is converted to index in `m_aColumnIndex`
+     */
+    _index2(_Index) {
+        const i = this._index(_Index);
+        if (i >= 0)
+            return i + 1; // add one to skip key
+    }
+    /**
      * Return (ui) index from raw column index. UI index is index for object that uses table data to store data
      * @param iIndex raw column index in `m_aColumn`
      */
@@ -1588,7 +1696,7 @@ export class CTableData {
         let iR, iC;
         if (!bRaw) {
             iR = this._row(iRow);
-            iC = this._index(_Column) + 1; // First column among rows has index to row
+            iC = this._index2(_Column); // First column among rows has index to row
         }
         else {
             iR = this._row(iRow);

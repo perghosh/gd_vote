@@ -64,9 +64,12 @@ JS: SetActiveState is used to switch state in page
          <div id="idContent" class="box" data-section="content">
             <!-- Vote section, here voter are able to vote, query = poll_question_list / poll_answer -->
             <div id="idPollTitle" class="is-size-3 has-text-weight-bold" style="color: #3aaa35; text-align: right; margin-bottom: 1em; margin-right: 1em;"></div>
+            <div id="idPollImage" style="display: block; text-align: center; margin-bottom: 1em;">
+            </div>
             <article id="idPollOverviewRelated" class="is-active is-size-5 has-text-weight-bold" data-index="1" style="color: #3aaa35;"></article>
             <article id="idPollVote" class="is-active" data-index="1" data-state="body.vote">
             </article>
+            <article id="idPollVoteMessage" class="has-text-info is-size-4" data-index="1"></article>
 
             <!-- Vote count is where votes for each answer is shown and buttons used to filter votes, query = poll_question_list / poll_answer_count -->
             <article id="idPollFilterCount" data-index="2" data-state="body.count">
@@ -133,7 +136,8 @@ JS: SetActiveState is used to switch state in page
                if( this.state?.debug ) {
                   const sSession = window.app.session;
                   const sAlias = window.app.alias;
-                  let s = `session: ${sSession}, alias: ${sAlias}`;
+                  const iPoll = window.app?.page.poll.poll || -1;
+                  let s = `session: ${sSession}, alias: ${sAlias}, poll: ${iPoll}`;
                   window.app.debug.print.innerText = s;
                }
             }
@@ -200,6 +204,15 @@ JS: SetActiveState is used to switch state in page
             let eScript = document.createElement('script');
             eScript.innerHTML = data.sResponseText;
             document.body.appendChild(eScript);
+         }
+         else if( sOperation === "debug" ) {
+            if( this.state?.debug ) {
+               const sSession = window.app.session;
+               const sAlias = window.app.alias;
+               const iPoll = window.app?.page.poll.poll || -1;
+               let s = `session: ${sSession}, alias: ${sAlias}, poll: ${iPoll}`;
+               window.app.debug.print.innerText = s;
+            }
          }
       }
 
@@ -459,7 +472,7 @@ JS: SetActiveState is used to switch state in page
 
 /* Colors: Default (blue) */
 .vote-check {color:#fff;}
-.vote-check > input + .toggle:before {content:'RÖST';}
+.vote-check > input + .toggle:before {content:'\2713';}
 .vote-check > input + .toggle:after {content:'-';}
 .vote-check > input + .toggle > .switch {background:#fff;}
 .vote-check > input + .toggle + .label {color:#000;}

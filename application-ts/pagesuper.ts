@@ -42,6 +42,7 @@ namespace details {
 
 export class CPageSuper {
    m_callAction: ((sMessage: string, data?: any) => void);// callback array for action hooks
+   m_oLabel: { [ label_id: string ]: string }; // labels in page
    m_oApplication: CApplication;
    m_oElement: { [key_name: string]: HTMLElement };
 
@@ -53,9 +54,12 @@ export class CPageSuper {
       oApplication.page = this;
 
       this.m_callAction = o.callback_action || null;
+      this.m_oLabel = {};
 
    }
 
+   // Get labels (text) in page
+   GetLabel( sId: string ) { return this.m_oLabel[sId]; }
 
    /**
     * Call owner to page, owner is probably a callback in the html page this page object is used for

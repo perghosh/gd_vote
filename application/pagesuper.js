@@ -5,7 +5,10 @@ export class CPageSuper {
         this.m_oApplication = oApplication; // application object
         oApplication.page = this;
         this.m_callAction = o.callback_action || null;
+        this.m_oLabel = {};
     }
+    // Get labels (text) in page
+    GetLabel(sId) { return this.m_oLabel[sId]; }
     /**
      * Call owner to page, owner is probably a callback in the html page this page object is used for
      * @param sMessage
