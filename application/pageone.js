@@ -89,7 +89,7 @@ export class CPageOne extends CPageSuper {
         this.m_oLabel = {
             "add_filter": "Visa röster för",
             "comment": "Kommentar",
-            "comment_in_edit": "Kommentar (frivilligt, skriv innehållsrikt och läsvärt, max 500 tecken)",
+            "comment_in_edit": "(frivillig kommentar, max 500 tecken)",
             "comments": "Kommentarer",
             "comment_orders": "new,Nya|old,Äldst",
             "comment_snapshots": "all,Alla|today,Idag|week,Senaste 7 dagar|month,Senaste 30 dagar",
@@ -118,7 +118,6 @@ export class CPageOne extends CPageSuper {
               eEditors.Add("string", edit.CEditInput);
         */
     }
-    get app() { return this.m_oApplication; } // get application object
     get poll() { return this.m_oPoll; }
     get queries_set() { return this.m_sQueriesSet; }
     ;
@@ -878,7 +877,12 @@ export class CPageOne extends CPageSuper {
                 }
                 e.className = "answer-comment";
                 e.style.display = "none";
-                e.innerHTML = '<textarea class="textarea is-primary" autocomplete="off" data-value="1" style="width: 100%;" placeholder="' + this.GetLabel("comment_in_edit") + '" rows="3"></textarea>';
+                let sPlaceHolder = oQuestion.label || "";
+                if (sPlaceHolder.length)
+                    sPlaceHolder += " ";
+                sPlaceHolder += this.GetLabel("comment_in_edit");
+                e.innerHTML = '<textarea class="textarea is-primary" autocomplete="off" data-value="1" style="width: 100%;" rows="3"></textarea>';
+                e.firstElementChild.setAttribute("placeholder", sPlaceHolder);
             });
         }
         TTVote.Render();
@@ -1265,7 +1269,8 @@ export class CPageOne extends CPageSuper {
                 key: iQuestion,
                 min: oTD.CELLGetValue(i, "Min"),
                 max: oTD.CELLGetValue(i, "Max"),
-                comment: oTD.CELLGetValue(i, "Comment")
+                comment: oTD.CELLGetValue(i, "Comment"),
+                label: oTD.CELLGetValue(i, "Label")
             });
             this.m_aQuestion.push(oQuestion);
         });
@@ -1569,22 +1574,25 @@ export class CPageOne extends CPageSuper {
         }
     }
     static HISTORYSerializeSession(bSave, sSession, sAlias) {
-        if (bSave === true) {
-            const oSession = { time: (new Date()).toISOString(), session: sSession, alias: sAlias };
-            localStorage.setItem("session", JSON.stringify(oSession));
+        return CPageSuper.SerializeSession(bSave, sSession, sAlias);
+        /*
+        if( bSave === true ) {
+           const oSession = { time: (new Date()).toISOString(), session: sSession, alias: sAlias };
+           localStorage.setItem( "session", JSON.stringify( oSession ) );
         }
         else {
-            const sSession = localStorage.getItem("session");
-            if (sSession) {
-                const oSession = JSON.parse(sSession);
-                // Compare date, if older than one hour then skip
-                const iDifference = (new Date()) - Date.parse(oSession.time);
-                if (iDifference < 10000000) {
-                    return [oSession.session, oSession.alias];
-                }
-            }
+           const sSession = localStorage.getItem("session");
+           if( sSession ) {
+              const oSession: { time: string, session: string, alias: string } = JSON.parse( sSession );
+              // Compare date, if older than one hour then skip
+              const iDifference: any = <any>(new Date()) - Date.parse(oSession.time);
+              if( iDifference <  10000000 ) {
+                 return [oSession.session,oSession.alias];
+              }
+           }
         }
-        return [null, null];
+        return [null,null];
+        */
     }
     /**
      * Mark condition, user need to know what is filtered on

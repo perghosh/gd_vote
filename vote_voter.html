@@ -1,0 +1,146 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title></title>
+</head>
+<body>
+   <div id="idPage" class="container" style="border:  3px solid #3aaa35; border-radius:  1em; padding: 1em;">
+      <div id="idUserMessage" data-section="information">
+         <div id="idError" data-message style="display: none;">
+            <div class="notification is-danger">
+               <pre></pre>
+               <button class="delete"></button>
+            </div>
+         </div>
+         <div id="idMessage" data-message style="display: none;">
+            <div class="notification is-info">
+               <p></p>
+               <button class="delete"></button>
+            </div>
+         </div>
+         <div id="idWarning" data-message style="display: none;">
+            <div class="notification is-warning">
+               <p></p>
+               <button class="delete"></button>
+            </div>
+         </div>
+      </div>
+      <div id="idDebugMessage"></div>
+   </div>
+   <div data-section="container" data-page-type="vote">
+
+      <!-- 
+       | Section used to present user data where user can register mail
+       -->
+      <div id="idUserRegister" class="box has-background-success-light">
+         <h1 class="title is-2" data-title></h1>
+         <p data-description></p>
+         <article class="content block box" data-article></article>
+      </div>
+   </div>
+
+   <script>
+      function PAGE_Setup() {
+         const [sSession,sAlias] = CPageVoter.HISTORYSerializeSession( false );   // load session and alias if found
+         window.app = new CApplication({ callback_action: PAGE_Callback, session: sSession, alias: sAlias });
+         window.app.Initialize();
+      }
+
+      /**
+       * Callback used by CPage class. CPage has the main page logic. Some logic is found here in html page
+       * @param sMessage type of operation
+       */
+      function PAGE_Callback(sOperation, data) {
+         if( sOperation === "load" ) {                      // queries are loaded for user, here you can sart
+
+            // ## Get url parameters
+            // 
+            const sQueryString = window.location.search;
+            const oParams = new URLSearchParams(sQueryString);
+
+            const sLanguage = oParams.get("language");      // language parameter
+            if( sLanguage ) {
+               window.app.request.Load(`translate_${sLanguage}.json`, "application/json", "set-language");
+            }
+
+            this.QUERYGetVoterRegisterInformation();
+         }
+         else if(sOperation === "server-session") {
+            if( !this.page) {
+               const sQuerySet = "vote";
+               this.m_oPage = new CPageVoter(this, {callback_action: PAGE_Callback, read_url: true, set: sQuerySet});
+               const sSession = window.app.request.session;
+               const sAlias = window.app.alias;
+               CPageVoter.HISTORYSerializeSession( true, sSession, sAlias );
+            }
+         }
+         else if( sOperation === "set-language" ) {
+            const oLanguage = JSON.parse( data.sResponseText );
+            window.app.page.TRANSLATEPage( oLanguage );
+         }
+         else if( sOperation === "js" ) {
+            let eScript = document.createElement('script');
+            eScript.innerHTML = data.sResponseText;
+            document.body.appendChild(eScript);
+         }
+
+      }
+
+   </script>
+
+
+   <!--
+    | Load needed components to manage login and vote data
+   -->
+   <script type="module">
+      import { edit } from "./library/TableDataEdit.js";
+      import { CTableData, browser } from "./library/TableData.js";
+      import { CTableDataTrigger } from "./library/TableDataTrigger.js";
+      import { SetTriggerName } from "./library/TableDataTriggerNames.js";
+      import { CUITableText } from "./library/UITableText.js";
+      import { CUIPagerPreviousNext } from "./library/UIPagerPreviousNext.js";
+      import { CDispatch } from "./library/Dispatch.js";
+
+      import { CRequest } from "./server/ServerRequest.js";
+      import { CQuery } from "./server/Query.js";
+
+      import { CApplication } from "./application/application.js";
+      import { CPageVoter } from "./application/pagevoter.js";
+
+
+      //window.URLSearchParamsss = URLSearchParamsss;
+
+      window.edit = edit;
+      window.CTableData = CTableData;
+      window.CTableData_browser = browser;
+      window.CUITableText = CUITableText;
+      window.CTableDataTrigger = CTableDataTrigger;
+      window.CUIPagerPreviousNext = CUIPagerPreviousNext;
+      window.CDispatch = CDispatch;
+
+      window.CApplication = CApplication;
+      window.CPageVoter = CPageVoter;
+
+      SetTriggerName();
+
+      window.CRequest = CRequest;
+      window.CQuery = CQuery;
+
+      window.onerror = function(sMessage, sUrl, iLine) {
+         if(typeof sMessage === "string") {
+            sMessage += "\n" + sUrl + "\nLine: " + iLine;
+            window.app.page.OpenMessage(sMessage, "error");
+         }
+      };
+
+
+      document.addEventListener('DOMContentLoaded', function() {
+         PAGE_Setup();
+      });
+   </script>
+
+
+</body>
+</html>

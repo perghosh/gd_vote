@@ -18,6 +18,7 @@ export class CApplication {
    m_callAction: ((sMessage: string, data: any) => void);// callback array for action hooks
    m_sAlias: string;
    m_oPage: CPageOne;
+   m_oPageList: { [key_name: string]: object };
    m_sQueriesSet: string;
    m_oEditors: edit.CEditors;
    m_oRequest: CRequest;
@@ -39,11 +40,12 @@ export class CApplication {
       });
 
       this.m_sAlias = o.alias || "guest";                                       // change this based on what alias that is used
-      //this.m_sAlias = "per";
       this.m_sQueriesSet = "vote";
       if(o.session) {
          this.m_oRequest.session = o.session;
       }
+
+      this.m_oPageList = {};
    }
 
    get alias() { return this.m_sAlias; }
@@ -83,6 +85,12 @@ export class CApplication {
    InitializePage( oState?: { [key_name: string]: string|number|boolean } ) {
       this.m_oPage = new CPageOne(this, {callback_action: this.m_callAction});
    }
+
+   AddPage(sName: string, oPage: any) {
+      this.m_oPageList[sName] = oPage;
+   }
+
+   GetPage( sName: string ): any { return this.m_oPageList[sName]; }
 
    CallOwner( sMessage: string, data?: any ) {
       if( this.m_callAction ) this.m_callAction.call( this, sMessage, data );

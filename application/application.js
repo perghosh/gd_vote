@@ -17,11 +17,11 @@ export class CApplication {
             //url: "http://localhost:8080/so/jq.srf?"
         });
         this.m_sAlias = o.alias || "guest"; // change this based on what alias that is used
-        //this.m_sAlias = "per";
         this.m_sQueriesSet = "vote";
         if (o.session) {
             this.m_oRequest.session = o.session;
         }
+        this.m_oPageList = {};
     }
     get alias() { return this.m_sAlias; }
     get debug() { return this.m_oDebug; }
@@ -56,6 +56,10 @@ export class CApplication {
     InitializePage(oState) {
         this.m_oPage = new CPageOne(this, { callback_action: this.m_callAction });
     }
+    AddPage(sName, oPage) {
+        this.m_oPageList[sName] = oPage;
+    }
+    GetPage(sName) { return this.m_oPageList[sName]; }
     CallOwner(sMessage, data) {
         if (this.m_callAction)
             this.m_callAction.call(this, sMessage, data);

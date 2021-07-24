@@ -7,6 +7,8 @@ export class CPageSuper {
         this.m_callAction = o.callback_action || null;
         this.m_oLabel = {};
     }
+    get app() { return this.m_oApplication; } // get application object
+    get session() { return this.m_oApplication.request.session; } // get session value for user
     // Get labels (text) in page
     GetLabel(sId) { return this.m_oLabel[sId]; }
     /**
@@ -64,6 +66,30 @@ export class CPageSuper {
             if (callback)
                 callback(i, o, oTD);
         }
+    }
+    /**
+     * Save or load session from local storage
+     * @param bSave {boolean} if true then session are saved, if false session are loaded
+     * @param sSession {string} session value
+     * @param sAlias {string} user alias to know if session match user
+     */
+    static SerializeSession(bSave, sSession, sAlias) {
+        if (bSave === true) {
+            const oSession = { time: (new Date()).toISOString(), session: sSession, alias: sAlias };
+            localStorage.setItem("session", JSON.stringify(oSession));
+        }
+        else {
+            const sSession = localStorage.getItem("session");
+            if (sSession) {
+                const oSession = JSON.parse(sSession);
+                // Compare date, if older than one hour then skip
+                const iDifference = (new Date()) - Date.parse(oSession.time);
+                if (iDifference < 10000000) {
+                    return [oSession.session, oSession.alias];
+                }
+            }
+        }
+        return [null, null];
     }
     /**
      * Callback for action events from ui table
@@ -134,11 +160,13 @@ export class CQuestion {
         this.m_iCountMin = typeof o.min === "number" ? o.min : 1;
         this.m_iCountMax = typeof o.max === "number" ? o.max : 1;
         this.m_bComment = (o.comment === 1 || o.comment === true) ? true : false;
+        this.m_sLabel = o.label || null;
     }
     get key() { return this.m_iKey; }
     get min() { return this.m_iCountMin; }
     get max() { return this.m_iCountMax; }
     get comment() { return this.m_bComment; }
+    get label() { return this.m_sLabel; }
 }
 /**
  * Internal state for sections in page

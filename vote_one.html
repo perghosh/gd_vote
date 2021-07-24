@@ -117,6 +117,8 @@ JS: SetActiveState is used to switch state in page
          const [sSession,sAlias] = CPageOne.HISTORYSerializeSession( false );
          window.app = new CApplication({ callback_action: PAGE_Callback, session: sSession, alias: sAlias });
          window.app.Initialize();
+
+         marked.setOptions({ breaks: true });        
       }
 
       /**
@@ -311,8 +313,6 @@ JS: SetActiveState is used to switch state in page
     | Load needed components to manage login and vote data
    -->
    <script type="module">
-      // #region LOAD_PAGE_COMPONENETS
-
       import { edit } from "./library/TableDataEdit.js";
       import { CTableData, browser } from "./library/TableData.js";
       import { CTableDataTrigger } from "./library/TableDataTrigger.js";
@@ -358,8 +358,6 @@ JS: SetActiveState is used to switch state in page
       document.addEventListener('DOMContentLoaded', function() {
          PAGE_Setup();
       });
-
-// #endregion
    </script>
 
 

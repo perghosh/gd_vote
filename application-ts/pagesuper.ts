@@ -24,6 +24,7 @@ namespace details {
       min?: number,   // min vote count for question
       max?: number,   // max vote count for question
       comment?: number|boolean,// allow or not allow comment for vote
+      label?: string, // label may be used as place holder in comment
    }
 
    /**
@@ -46,7 +47,6 @@ export class CPageSuper {
    m_oApplication: CApplication;
    m_oElement: { [key_name: string]: HTMLElement };
 
-
    constructor(oApplication, oOptions?: details.page_construct) {
       const o = oOptions || {};
 
@@ -57,6 +57,9 @@ export class CPageSuper {
       this.m_oLabel = {};
 
    }
+
+   get app() { return this.m_oApplication; }                                   // get application object
+   get session(): string { return this.m_oApplication.request.session; }       // get session value for user
 
    // Get labels (text) in page
    GetLabel( sId: string ) { return this.m_oLabel[sId]; }
@@ -116,6 +119,32 @@ export class CPageSuper {
          if(callback) callback(i, o, oTD);
       }
    }
+
+   /**
+    * Save or load session from local storage
+    * @param bSave {boolean} if true then session are saved, if false session are loaded
+    * @param sSession {string} session value
+    * @param sAlias {string} user alias to know if session match user
+    */
+   static SerializeSession( bSave: boolean, sSession: string, sAlias?: string ): [string,string] |null {
+      if( bSave === true ) {
+         const oSession = { time: (new Date()).toISOString(), session: sSession, alias: sAlias };
+         localStorage.setItem( "session", JSON.stringify( oSession ) );
+      }
+      else {
+         const sSession = localStorage.getItem("session");
+         if( sSession ) {
+            const oSession: { time: string, session: string, alias: string } = JSON.parse( sSession );
+            // Compare date, if older than one hour then skip
+            const iDifference: any = <any>(new Date()) - Date.parse(oSession.time);
+            if( iDifference <  10000000 ) {
+               return [oSession.session,oSession.alias];
+            }
+         }
+      }
+      return [null,null];
+   }
+
 
    /**
     * Callback for action events from ui table
@@ -183,6 +212,7 @@ export class CQuestion {
    m_iCountMin: number;  // Min number of votes for question
    m_iCountMax: number;  // Max number of votes for question
    m_bComment: boolean;  // Allow to comment vote on question
+   m_sLabel: string;     // If question has some specific label to hint what to write in comment
 
    constructor( options: details.question_construct ) {
       const o = options;
@@ -190,12 +220,14 @@ export class CQuestion {
       this.m_iCountMin = typeof o.min === "number" ? o.min : 1;
       this.m_iCountMax = typeof o.max === "number" ? o.max : 1;
       this.m_bComment = ( o.comment === 1 || o.comment === true ) ? true : false;
+      this.m_sLabel = o.label || null;
    }
 
    get key() { return this.m_iKey; }
    get min() { return this.m_iCountMin; }
    get max() { return this.m_iCountMax; }
    get comment() { return this.m_bComment; }
+   get label() { return this.m_sLabel; }
 }
 
 
