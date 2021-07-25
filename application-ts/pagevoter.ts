@@ -73,9 +73,10 @@ export class CPageVoter extends CPageSuper {
             }
             break;
          default: {
-            let iPosition = sName.indexOf("get_query_information-");
+            let iPosition = sName.indexOf("get_column_information-");
             if( iPosition === 0 ) {
-               if( oResult.name === "login" ) {
+               sName = sName.substr( 23 );
+               if( sName === "login" ) {
                   this.PAGECreateRegisterVoter( oResult );
                }
             }
@@ -99,12 +100,13 @@ export class CPageVoter extends CPageSuper {
 
    QUERYGetVoterRegisterInformation(): void {
       let request = this.app.request;
-      let oCommand: {[key:string]: string|number} = { command: "get_query_information", query: "login", set: this.queries_set };
+      let oCommand: {[key:string]: string|number} = { command: "get_column_information", query: "login", set: this.queries_set };
       request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", json: request.GetJson(oCommand) });
    }
 
    PAGECreateRegisterVoter( oResult: any ): void {
       console.log( oResult );
+      // https://www.databasejournal.com/features/mssql/article.php/3714031/SQL-Server-2005-Encryption-types.htm
    }
 
 
