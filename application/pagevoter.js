@@ -69,6 +69,7 @@ export class CPageVoter extends CPageSuper {
     }
     PAGECreateRegisterVoter(oResult) {
         console.log(oResult);
+        // https://www.databasejournal.com/features/mssql/article.php/3714031/SQL-Server-2005-Encryption-types.htm
     }
     static HISTORYSerializeSession(bSave, sSession, sAlias) {
         return CPageSuper.SerializeSession(bSave, sSession, sAlias);

@@ -1772,8 +1772,12 @@ export class CPageOne extends CPageSuper {
             const ePage = document.getElementById("idPage");
             for (const [sKey, sText] of Object.entries(oLanguage.page)) {
                 const e = ePage.querySelector('[data-translate="page.' + sKey + '"]');
-                if (e)
-                    e.childNodes[0].textContent = sText;
+                if (e) {
+                    if (e.hasChildNodes())
+                        e.childNodes[0].textContent = sText;
+                    else
+                        e.textContent = sText;
+                }
             }
         }
         // translate labels in page

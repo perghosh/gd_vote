@@ -63,7 +63,10 @@ JS: SetActiveState is used to switch state in page
 
          <div id="idContent" class="box" data-section="content">
             <!-- Vote section, here voter are able to vote, query = poll_question_list / poll_answer -->
-            <div id="idPollTitle" class="is-size-3 has-text-weight-bold" style="color: #3aaa35; text-align: right; margin-bottom: 1em; margin-right: 1em;"></div>
+            <div style="border-right: 4px solid #3aaa35;">
+               <div id="idResponsible" class="is-size-5 has-text-weight-bold" style="color: #c7c6c6; text-align: right; margin-bottom: 0.1em; margin-right: 1em;" data-translate="page.owner"></div>
+               <div id="idPollTitle" class="is-size-2 has-text-weight-bold" style="color: #3aaa35; text-align: right; margin-bottom: 1em; margin-right: 1em;"></div>
+            </div>
             <div id="idPollImage" style="display: block; text-align: center; margin-bottom: 1em;">
             </div>
             <article id="idPollOverviewRelated" class="is-active is-size-5 has-text-weight-bold" data-index="1" style="color: #3aaa35;"></article>
@@ -163,7 +166,8 @@ JS: SetActiveState is used to switch state in page
 
             const sLanguage = oParams.get("language");      // language parameter
             if( sLanguage ) {
-               window.app.request.Load(`translate_${sLanguage}.json`, "application/json", "set-language");
+               if( sLanguage == "1" ) window.app.request.Load(`translate.json`, "application/json", "set-language");
+               else window.app.request.Load(`translate_${sLanguage}.json`, "application/json", "set-language");
             }
          }
          else if( sOperation === "insert-voter" ) {
@@ -364,6 +368,7 @@ JS: SetActiveState is used to switch state in page
 </body>
 <head>
    <meta charset="iso-8859-1">
+
    <title>Vote</title>
    <!-- Bulma css -->
    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.1/css/bulma.min.css">
