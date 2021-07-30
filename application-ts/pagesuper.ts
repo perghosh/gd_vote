@@ -111,7 +111,7 @@ export class CPageSuper {
          const o = aHeader[ i ];
          oTD.COLUMNSetPropertyValue(i, "id", o.id);
          oTD.COLUMNSetPropertyValue(i, "name", o.name);
-         oTD.COLUMNSetPropertyValue(i, "alias", o.simple);
+         oTD.COLUMNSetPropertyValue(i, "alias", o.simple || o.alias);
          oTD.COLUMNSetType(i, o.select_type_name);
          if( typeof o.order === "number" && o.order !== 0 ) {
             oTD.COLUMNSetPropertyValue(i, "state.sorted", o.order);   

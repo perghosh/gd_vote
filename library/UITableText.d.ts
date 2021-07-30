@@ -372,6 +372,12 @@ export declare class CUITableText implements IUITableData {
     ELEMENTGetCell(aRow: [number, number], sSection?: string): HTMLElement;
     ELEMENTGetCell(iRow: number, iColumn: number, sSection?: string): HTMLElement;
     /**
+     * Return element for label.
+     * @param {HTMLElement} e Cell element container
+     * @returns {HTMLElement} element to label or null if not found
+     */
+    ELEMENTGetCellLabel(e: HTMLElement): HTMLElement;
+    /**
      * Return value element in cell. Get value element in cell if cell has generated dom tree inside
      * @param {HTMLElement} e Cell element
      * @returns {HTMLElement} element to value or null if not found

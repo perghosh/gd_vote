@@ -1023,6 +1023,17 @@ export class CUITableText {
         return null;
     }
     /**
+     * Return element for label.
+     * @param {HTMLElement} e Cell element container
+     * @returns {HTMLElement} element to label or null if not found
+     */
+    ELEMENTGetCellLabel(e) {
+        if (e && (this.is_state(1 /* HtmlValue */) || e.firstElementChild)) {
+            return e.querySelector("[data-label]");
+        }
+        return null;
+    }
+    /**
      * Return value element in cell. Get value element in cell if cell has generated dom tree inside
      * @param {HTMLElement} e Cell element
      * @returns {HTMLElement} element to value or null if not found
@@ -1351,15 +1362,21 @@ export class CUITableText {
                         if (callRenderer) {
                             callRenderer.call(this, e, sValue, [[iIndex, i], [iRow, iC], oColumn]); // custom render for column
                         }
-                        else if (sValue !== null && sValue != void 0) {
-                            if ("value" in e) {
-                                e.setAttribute("value", sValue.toString());
+                        else {
+                            if (sValue !== null && sValue != void 0) {
+                                if ("value" in e) {
+                                    e.setAttribute("value", sValue.toString());
+                                }
+                                else
+                                    e.innerText = sValue.toString();
                             }
-                            else
-                                e.innerText = sValue.toString();
+                            else if (e.hasAttribute("value") === false) {
+                                e.innerText = " ";
+                            }
+                            e = this.ELEMENTGetCellLabel(eColumn);
+                            if (e && !e.firstChild)
+                                e.innerText = oColumn.alias;
                         }
-                        else if (e.hasAttribute("value") === false)
-                            e.innerText = " ";
                     }
                     if (bCall)
                         this.m_acallRender.forEach((call) => { call.call(this, "afterCellValue", sValue, eColumn, oColumn); });

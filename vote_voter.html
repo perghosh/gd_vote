@@ -1,10 +1,6 @@
 ﻿<!DOCTYPE html>
 
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
-<head>
-    <meta charset="utf-8" />
-    <title></title>
-</head>
 <body>
    <div id="idPage" class="container" style="border:  3px solid #3aaa35; border-radius:  1em; padding: 1em;">
       <div id="idUserMessage" data-section="information">
@@ -27,9 +23,7 @@
             </div>
          </div>
       </div>
-      <div id="idDebugMessage"></div>
-   </div>
-   <div data-section="container" data-page-type="vote">
+   <div id="idDebugMessage"></div>
 
       <!-- 
        | Section used to present user data where user can register mail
@@ -37,8 +31,11 @@
       <div id="idUserRegister" class="box has-background-success-light">
          <h1 class="title is-2" data-title></h1>
          <p data-description></p>
-         <article class="content block box" data-article></article>
+         <article class="content block box" data-article>
+            
+         </article>
       </div>
+
    </div>
 
    <script>
@@ -143,4 +140,21 @@
 
 
 </body>
+<head>
+   <meta charset="iso-8859-1">
+
+   <title>Register</title>
+   <!-- Bulma css -->
+   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.1/css/bulma.min.css">
+   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma-helpers/0.4.0/css/bulma-helpers.min.css" integrity="sha512-U6ELnUi7oqVEjkLmFw5r5UR5LEtvpImS/jUykBKneVhD0lxZxfJZ3k3pe003ktrtNZYungd9u3Urp2X09wKwXg==" crossorigin="anonymous" />
+   <!-- fontawesome -->
+   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" integrity="sha512-iBBXm8fW90+nuLcSKlbmrPcLa0OT92xO1BIsZ+ywDWZCvqsWgccV3gFoRBv0z+8dLJgyAHIhR35VZc2oM/gI1w==" crossorigin="anonymous" />
+   <style>
+   section, tbody {
+      outline: none;
+   }
+   </style>
+
+</head> 
+
 </html>

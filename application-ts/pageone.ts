@@ -691,7 +691,6 @@ export class CPageOne extends CPageSuper {
    QUERYGetPollFilterCount(iPoll: number);
    QUERYGetPollFilterCount( oAnswer: { answer: number } );
    QUERYGetPollFilterCount( oAnswer: { condition: string } );
-   //QUERYGetPollFilterCount( oOrder: { index: number } );
    QUERYGetPollFilterCount( _1: any) {
       let request = this.app.request;
       const sQuery = "poll_answer_filtercount";

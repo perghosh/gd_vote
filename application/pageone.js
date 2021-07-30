@@ -594,7 +594,6 @@ export class CPageOne extends CPageSuper {
         let oCommand = { command: "add_condition_to_query get_result", delete: 1, query: "poll_overview_related", set: this.queries_set, count: 50, format: 1, start: 0 };
         request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
     }
-    //QUERYGetPollFilterCount( oOrder: { index: number } );
     QUERYGetPollFilterCount(_1) {
         let request = this.app.request;
         const sQuery = "poll_answer_filtercount";
