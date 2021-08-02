@@ -480,12 +480,13 @@ export declare class CTableData {
      */
     ROWAppend(_Row?: number | unknown[] | unknown[][], bRaw?: boolean): [number, number];
     /**
-     *
-     * @param {number} iRow row position  where to insert new rows
-     * @param _Row
+     * Insert row into table at selected row position. Position is set using row key
+     * @param {number} iRow row key to position  where to insert new rows
+     * @param {number | unknown[] | unknown[][])} _Row
      * @returns [number,number] keys to added rows, first key and first and one more than last key for added rows
      */
     ROWInsert(iRow: number, _Row?: number | unknown[] | unknown[][]): [number, number];
+    ROWValidate(iRow: number): boolean | [number, string][];
     ROWRemove(iRow: number, iLength?: number): unknown[];
     /**
      * Expands each row in table with 1 or more columns

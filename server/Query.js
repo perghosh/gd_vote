@@ -57,6 +57,25 @@ export class CQuery {
         const sXml = (new XMLSerializer()).serializeToString(xml);
         return sXml;
     }
+    VALUEAdd(_1, _2) {
+        if (Array.isArray(_1)) {
+            this.m_aValue = this.m_aValue.concat(_1);
+        }
+        else if (typeof _1 === "object")
+            this.m_aValue.push(_1);
+        else {
+            let oValue = {};
+            if (typeof _1 === "number")
+                oValue.index = _1;
+            else if (typeof _1 === "string")
+                oValue.name = _1;
+            oValue.value = _2;
+            if (_2 === null || _2 === undefined)
+                oValue.is_null = 1;
+            this.m_aValue.push(oValue);
+        }
+        return this.m_aValue.length;
+    }
     VALUEGetXml(oOptions, doc) {
         oOptions = oOptions || {};
         let xml = CQuery.VALUEGetDocument(this.m_aValue, oOptions, doc);
@@ -103,6 +122,13 @@ export class CQuery {
         });
         return doc;
     }
+    /**
+     * [VALUEGetDocument description]
+     * @param  {details.value[]} aValue  [description]
+     * @param  {object}         oOptions [description]
+     * @param  {XMLDocument}    doc [description]
+     * @return {XMLDocument} [description]
+     */
     static VALUEGetDocument(aValue, oOptions, doc) {
         doc = doc || (new DOMParser()).parseFromString("<document/>", "text/xml");
         let xml = doc.documentElement;

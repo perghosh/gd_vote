@@ -56,6 +56,20 @@ export declare class CQuery {
         value?: string;
         document?: boolean;
     }, doc?: XMLDocument): XMLDocument | string;
+    /**
+     * Add table valuem may be used to insert value to table in database
+     * @param  {string}  sName  name for value
+     * @param  {unknown} _Value value
+     * @return {number}  number of values in internal list of values
+     */ /**
+    * Add table valuem may be used to insert value to table in database
+    * @param  {number} iIndex number matching index in query used to extract column information for value in table
+    * @param  {unknown} _Value value
+    * @return {number}  number of values in internal list of values
+    */
+    VALUEAdd(sName: string, _Value: unknown): number;
+    VALUEAdd(iIndex: string, _Value: unknown): number;
+    VALUEAdd(aValue: details.value[] | details.value): number;
     VALUEGetXml(oOptions?: {
         index?: number;
         values?: string;
@@ -70,6 +84,13 @@ export declare class CQuery {
         header?: string;
         value?: string;
     }, doc?: XMLDocument): XMLDocument;
+    /**
+     * [VALUEGetDocument description]
+     * @param  {details.value[]} aValue  [description]
+     * @param  {object}         oOptions [description]
+     * @param  {XMLDocument}    doc [description]
+     * @return {XMLDocument} [description]
+     */
     static VALUEGetDocument(aValue: details.value[], oOptions: {
         index?: number;
         row?: string;

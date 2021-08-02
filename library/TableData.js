@@ -138,7 +138,7 @@ export class CTableData {
             switch (sKey) {
                 case "max":
                     if (eType & 262144 /* group_string */) {
-                        if (_Value.toString().length > _rule)
+                        if ((_Value || "").toString().length > _rule)
                             aError = [false, sKey];
                     }
                     else if (eType & 65536 /* group_number */) {
@@ -155,7 +155,7 @@ export class CTableData {
                     break;
                 case "min":
                     if (eType & 262144 /* group_string */) {
-                        if (_Value.toString().length < _rule)
+                        if ((_Value || "").toString().length < _rule)
                             aError = [false, sKey];
                     }
                     else if (eType & 65536 /* group_number */) {
@@ -182,8 +182,10 @@ export class CTableData {
                     }
                     break;
                 case "required":
-                    if (_Value === void 0 || _Value === null || _Value === "")
-                        aError = [false, sKey];
+                    if (_rule) {
+                        if (_Value === void 0 || _Value === null || _Value === "")
+                            aError = [false, sKey];
+                    }
                     break;
             }
         }
@@ -1380,9 +1382,9 @@ export class CTableData {
         return [iFirst, this.m_iNextKey];
     }
     /**
-     *
-     * @param {number} iRow row position  where to insert new rows
-     * @param _Row
+     * Insert row into table at selected row position. Position is set using row key
+     * @param {number} iRow row key to position  where to insert new rows
+     * @param {number | unknown[] | unknown[][])} _Row
      * @returns [number,number] keys to added rows, first key and first and one more than last key for added rows
      */
     ROWInsert(iRow, _Row) {
@@ -1420,6 +1422,25 @@ export class CTableData {
         // Rows are prepared, time to insert
         this.m_aBody.splice(iRow, 0, aRow);
         return [iFirst, this.m_iNextKey];
+    }
+    ROWValidate(iRow) {
+        let aError = [];
+        let iR = this._row(iRow); // get row position in body
+        let aRow = this.m_aBody[iR];
+        for (let i = 0, iTo = this.m_aColumn.length; i < iTo; i++) {
+            const o = this.m_aColumn[i];
+            const oPosition = o.position;
+            if (oPosition.hide)
+                continue;
+            const _ok = CTableData.ValidateValue(aRow[i + 1], o);
+            if (_ok !== true) {
+                let iIndex = o.position.index;
+                if (isNaN(iIndex))
+                    iIndex = i;
+                aError.push([iIndex, _ok[1]]);
+            }
+        }
+        return aError.length ? aError : true;
     }
     ROWRemove(iRow, iLength) {
         iLength = iLength || 1;

@@ -54,6 +54,25 @@ export class CPageVoter extends CPageSuper {
    SendRegisterVoter(): boolean {
       const aTD = this.uitabletext.login.data;
 
+      let oQuery = new CQuery();
+
+      const aRow = aTD.ROWGet( 0 );
+      for( let i = 0, iTo = aRow.length; i < iTo; i++ ) {
+         const oC = aTD.COLUMNGet( i );
+         if( oC.position.hide ) continue;
+         oQuery.VALUEAdd( oC.name, aRow[i] );
+      }
+
+      let oDocument = (new DOMParser()).parseFromString("<document/>", "text/xml");
+      oQuery.VALUEGetXml({ values: "row", document: true }, oDocument);
+      const sXml = (new XMLSerializer()).serializeToString(oDocument);
+
+      console.log( oQuery.values );
+
+      let oCommand = { command: "add_rows", query: "login", set: this.queries_set, table: "TVoter1" };
+      let request = this.app.request;
+      request.Get("SCRIPT_Run", { file: "PAGE_result_edit.lua", json: request.GetJson(oCommand) }, sXml);
+
 
       return true;
    }
@@ -124,6 +143,10 @@ export class CPageVoter extends CPageSuper {
       request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", json: request.GetJson(oCommand) });
    }
 
+   /**
+    * Create section with markup to register voter
+    * @param {any} oHeader [description]
+    */
    PAGECreateRegisterVoter( oHeader: any ): void {
       let TDLogin = new CTableData({ id: "login", name: "login" });
       CPageSuper.ReadColumnInformationFromHeader(TDLogin, oHeader);
@@ -133,6 +156,8 @@ export class CPageVoter extends CPageSuper {
       TDLogin.COLUMNSetPropertyValue([1,2,3], "edit.name", "string");
       TDLogin.COLUMNSetPropertyValue([1,2,3], [ "edit.edit", "format.required"], true );
       TDLogin.COLUMNSetPropertyValue([1,2,3], [ "format.min"], 3 );
+
+      //let _Error = TDLogin.ROWValidate( 0 );
 
       let oStyle = {
          html_value: `
@@ -161,18 +186,11 @@ export class CPageVoter extends CPageSuper {
          parent: eContainer,                                                    // container
          section: [ "body", "statusbar" ],
          state: enumState.HtmlValue | enumState.SetValue,
-         style: oStyle,
+         style: oStyle,                                                         // styles for generated elements
          table: TDLogin,                                                        // source data
          name: "login",                                                         // name to access UI table in CTableData
          trigger: oTrigger,                                                     // set trigger object, this will enable triggers
          edit: true                                                             // enable edit
-         /*,                                                               
-         callback_render: (sType, _value, eElement, oColumn) => {
-            if(sType === "afterCellValue") {
-               let eLabel = eElement.querySelector("[data-label]");
-               eLabel.innerText = oColumn.alias;
-            }
-         }*/
       };
 
       let TTLogin = new CUITableText(options);
@@ -206,12 +224,17 @@ export class CPageVoter extends CPageSuper {
    static CALLBACK_TableData(oEventData, v ) {                            
       let sName = CTableDataTrigger.GetTriggerName( oEventData.iEvent ); 
       switch( sName ) {
+      case "AfterSetValue":
+         let eButton = oEventData.dataUI.GetSection("statusbar").querySelector("button");
+         if( oEventData.data.ROWValidate( 0 ) === true ) eButton.disabled = false;
+         else eButton.disabled = true;
+         break;
       case "BeforeSetCellError":
          let eCell = oEventData.eElement.closest(".base");
          let _type = oEventData.information;
          let e = eCell.querySelector("[data-error]");
          e.innerText = _type[1];
-         //e.style.display = "block";
+         oEventData.dataUI.GetSection("statusbar").querySelector("button").disabled = true;
          break;
 
       }
