@@ -5,7 +5,7 @@ import { CQuery } from "./../server/Query.js"
 import { CApplication } from "application.js"
 
 
-namespace details {
+export namespace details {
    export const enum enumQueryState { send = 0, waiting = 1, delivered = 2, conditions = 10}
 
    export type condition = { ready?: boolean, table: string, id: string, value: string|number, simple?: string, operator?: number }
@@ -38,7 +38,26 @@ namespace details {
       query: [string,number,(condition[] | boolean)][],// query for state, second item is condition or if false no condition is added to query
       section: string,     // page section
    }
+
+   export type query_result = {
+      aggregates?: number,
+      cell_command?: boolean, // if cells has commands
+      cell_style?: string,
+      count?: number,
+      id?: string,         // query id key
+      name?: string,       // query name
+      page?: number,
+      row_command?: boolean, // if row has commands (lua operations)
+      table: {
+         body: unknown[][],
+         count?: number,    // number of rows in result
+         header: { [key_name: string]: string | number }[]
+      }
+      style?: string
+   }
 }
+
+//export type query_result = details.query_result;
 
 
 export class CPageSuper {

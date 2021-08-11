@@ -63,14 +63,15 @@ JS: SetActiveState is used to switch state in page
 
          <div id="idContent" class="box" data-section="content">
             <!-- Vote section, here voter are able to vote, query = poll_question_list / poll_answer -->
-            <div style="border-right: 4px solid #3aaa35;">
+            <!-- <article id="idPollOverviewRelated" class="is-active is-size-5 has-text-weight-bold" data-index="1" style="color: #3aaa35;"></article> -->
+            <div style="border: 1px solid #3aaa35; border-radius: 15px; color: #000; margin-bottom: 1em;">
                <div id="idResponsible" class="is-size-5 has-text-weight-bold" style="color: #c7c6c6; text-align: right; margin-bottom: 0.1em; margin-right: 1em;" data-translate="page.owner"></div>
-               <div id="idPollTitle" class="is-size-2 has-text-weight-bold" style="color: #3aaa35; text-align: right; margin-bottom: 1em; margin-right: 1em;"></div>
+               <div id="idPollTitle" class="is-size-2 has-text-weight-bold" style="color: #3aaa35; text-align: right; margin-right: 1em;"></div>
+               <article id="idPollOverviewRelated" class="is-active is-size-5 has-text-weight-bold" data-index="1" style="border-bottom: 1px solid #c7c6c6; border-top: 1px solid #c7c6c6; margin: 0.5em;"></article>
+               <div id="idPollImage" style="display: block; text-align: center; margin-bottom: 1em;">
+               </div>
             </div>
-            <div id="idPollImage" style="display: block; text-align: center; margin-bottom: 1em;">
-            </div>
-            <article id="idPollOverviewRelated" class="is-active is-size-5 has-text-weight-bold" data-index="1" style="color: #3aaa35;"></article>
-            <article id="idPollVote" class="is-active" data-index="1" data-state="body.vote">
+            <article id="idPollVote" class="is-active" data-index="1" data-state="body.vote" style="border: 1px solid #3aaa35; border-radius: 15px; color: #000; padding: 1em;">
             </article>
             <article id="idPollVoteMessage" class="has-text-info is-size-4" data-index="1"></article>
 
@@ -368,7 +369,6 @@ JS: SetActiveState is used to switch state in page
 </body>
 <head>
    <meta charset="iso-8859-1">
-
    <title>Vote</title>
    <!-- Bulma css -->
    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.1/css/bulma.min.css">

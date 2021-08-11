@@ -83,6 +83,13 @@ export class CApplication {
         var sError = eSection ? eSection.getAttribute("error") : "";
         if (sError === "1") {
             let sError = eSection.textContent;
+            const iError = sError.indexOf("%%"); // search for %%, if found this is a special error
+            if (iError !== -1) {
+                const iErrorTo = sError.indexOf("%%", iError + 2);
+                if (iErrorTo !== -1 && iErrorTo - iError < 40) { // found start and end of error name ?
+                    sError = sError.substring(iError, iErrorTo);
+                }
+            }
             throw sError;
         }
         else if (sMethod === "SCRIPT_Run") {

@@ -175,7 +175,7 @@ export class CTableData {
                     if (!Array.isArray(a))
                         a = [a];
                     for (let i = 0; i < a.length; i++) {
-                        if ((new RegExp(a[i], 'g')).test(_Value.toString()) === false) {
+                        if ((new RegExp(a[i], 'g')).test((_Value || "").toString()) === false) {
                             aError = [false, sKey];
                             break;
                         }
@@ -1423,6 +1423,11 @@ export class CTableData {
         this.m_aBody.splice(iRow, 0, aRow);
         return [iFirst, this.m_iNextKey];
     }
+    /**
+     * Validate values in row
+     * @param  {number}  iRow key to row that is validated
+     * @return {boolean | [number,string][]} true if row values is ok, otherwise error information in array
+     */
     ROWValidate(iRow) {
         let aError = [];
         let iR = this._row(iRow); // get row position in body
@@ -1442,9 +1447,16 @@ export class CTableData {
         }
         return aError.length ? aError : true;
     }
+    /**
+     * Remove row in body
+     * @param  {number} iRow key to row that is removed
+     * @param  {number} iLength number of rows that is removed after specified row
+     * @return {unknown[]} removed rows
+     */
     ROWRemove(iRow, iLength) {
+        let iR = this._row(iRow); // get row position in body
         iLength = iLength || 1;
-        return this.m_aBody.splice(iRow, iLength);
+        return this.m_aBody.splice(iR, iLength);
     }
     /**
      * Expands each row in table with 1 or more columns

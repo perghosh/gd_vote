@@ -302,6 +302,7 @@ export class CUITableText {
     /** BLOG: querySelector
      * Return element for specified section.
      * Section elements are stored in array with section names, when section is created it is also stored. Array works as cache.
+     * Sample secitons could be "toolbar", "title", "header", "body", "footer", "statusbar". It depends on what sections is set to be created.
      * @param {string} sName name for section, valid names are found in this.m_aSection
      * @param {boolean} [bNoThrow] If true then return null if section isn't found
      * @returns {HTMLElement} Element for section or null if not found
@@ -1788,10 +1789,10 @@ export class CUITableText {
         let _HtmlCell = CTableData.GetPropertyValue(this.m_oStyle, false, "html_cell"); // span is default for cell
         _HtmlCell = this._split(_HtmlCell, "span");
         //      let sHtmlCell: string = <string>CTableData.GetPropertyValue(this.m_oStyle, false, "html_cell") || "span"; // span is default for cell
-        let sHtmlValue = CTableData.GetPropertyValue(this.m_oStyle, false, "html_value");
-        if (typeof sHtmlValue === "string")
-            sHtmlValue = sHtmlValue.trim();
-        this.set_state(sHtmlValue, 1 /* HtmlValue */); // set state if cell is a dom tree or not
+        let _HtmlValue = CTableData.GetPropertyValue(this.m_oStyle, false, "html_value");
+        if (typeof _HtmlValue === "string")
+            _HtmlValue = _HtmlValue.trim();
+        this.set_state(_HtmlValue, 1 /* HtmlValue */); // set state if cell is a dom tree or not
         /*
               if(!sHtmlCell) sHtmlCell = "span";                                       // span is default element for values
               if( sHtmlCell.indexOf(".") !== -1 ) {
@@ -1799,7 +1800,7 @@ export class CUITableText {
                  if(a.length > 1) [ sHtmlCell, sClass ] = a;                           // element for value, this can be element name and class if format is in "element_name.class_names" like "span.value".
               }
         */
-        let set_row_attr = (eRow, iRow, aColumn, _HtmlCell, sValue, sStyle) => {
+        let set_row_attr = (eRow, iRow, aColumn, _HtmlCell, _HtmlValue, sStyle) => {
             eRow.dataset.r = iRow.toString();
             eRow.dataset.c_row = "C" + aColumn.join(",C") + ",";
             aColumn.forEach((i, j) => {
@@ -1842,8 +1843,23 @@ export class CUITableText {
                 const oFormat = this.m_aColumnFormat[iColumn];
                 if (typeof oFormat.html === "string")
                     e.innerHTML = oFormat.html;
-                else if (sHtmlValue)
-                    e.innerHTML = sHtmlValue;
+                else if (_HtmlValue) {
+                    let s;
+                    if (typeof _HtmlValue === "string")
+                        s = _HtmlValue;
+                    else {
+                        for (let iValueIndex = 0; iValueIndex < _HtmlValue.length; iValueIndex++) {
+                            const a = _HtmlValue[iValueIndex];
+                            if (a[0] === i) {
+                                s = a[1];
+                                break;
+                            }
+                            else if (a[0] === -1)
+                                s = a[1]; // default value has -1
+                        }
+                    }
+                    e.innerHTML = s;
+                }
                 if (sStyle)
                     e.style.cssText = sStyle;
                 eRow.appendChild(eCell);
@@ -1868,18 +1884,18 @@ export class CUITableText {
         while (aRowLevel[iLevelIndex] < 0) { // rows before main row
             let aRow = this._create_row(_HtmlBefore);
             oRowRows.SetRowElement(iLevelIndex, aRow[1]);
-            set_row_attr(aRow[1], aRowLevel[iLevelIndex], oRowRows.GetRowColumns(iLevelIndex), _HtmlCell, sHtmlValue, sStyle);
+            set_row_attr(aRow[1], aRowLevel[iLevelIndex], oRowRows.GetRowColumns(iLevelIndex), _HtmlCell, _HtmlValue, sStyle);
             aRow[1].dataset.i = iLevelIndex.toString();
             iLevelIndex++;
         }
         oRowRows.SetRowElement(iLevelIndex, aRowMain[1]); // main row
-        set_row_attr(aRowMain[1], aRowLevel[iLevelIndex], oRowRows.GetRowColumns(iLevelIndex), _HtmlCell, sHtmlValue, sStyle);
+        set_row_attr(aRowMain[1], aRowLevel[iLevelIndex], oRowRows.GetRowColumns(iLevelIndex), _HtmlCell, _HtmlValue, sStyle);
         aRowMain[1].dataset.i = iLevelIndex.toString();
         iLevelIndex++;
         if (aRowLevel[iLevelIndex] > 0) { // rows after main row
             let aRow = this._create_row(_HtmlAfter);
             oRowRows.SetRowElement(iLevelIndex, aRow[1]);
-            set_row_attr(aRow[1], aRowLevel[iLevelIndex], oRowRows.GetRowColumns(iLevelIndex), _HtmlCell, sHtmlValue, sStyle);
+            set_row_attr(aRow[1], aRowLevel[iLevelIndex], oRowRows.GetRowColumns(iLevelIndex), _HtmlCell, _HtmlValue, sStyle);
             aRow[1].dataset.i = iLevelIndex.toString();
             iLevelIndex++;
         }

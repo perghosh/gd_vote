@@ -486,7 +486,18 @@ export declare class CTableData {
      * @returns [number,number] keys to added rows, first key and first and one more than last key for added rows
      */
     ROWInsert(iRow: number, _Row?: number | unknown[] | unknown[][]): [number, number];
+    /**
+     * Validate values in row
+     * @param  {number}  iRow key to row that is validated
+     * @return {boolean | [number,string][]} true if row values is ok, otherwise error information in array
+     */
     ROWValidate(iRow: number): boolean | [number, string][];
+    /**
+     * Remove row in body
+     * @param  {number} iRow key to row that is removed
+     * @param  {number} iLength number of rows that is removed after specified row
+     * @return {unknown[]} removed rows
+     */
     ROWRemove(iRow: number, iLength?: number): unknown[];
     /**
      * Expands each row in table with 1 or more columns

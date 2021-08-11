@@ -1,4 +1,5 @@
 import { CTableDataTrigger } from "./../library/TableDataTrigger.js";
+//export type query_result = details.query_result;
 export class CPageSuper {
     constructor(oApplication, oOptions) {
         const o = oOptions || {};

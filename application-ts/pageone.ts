@@ -21,6 +21,9 @@ pageone = page logic for managing one vote, user can not select any votes. activ
 | QUERYGetSearch | Get search result for finding new vite |
 | QUERYGetPollRelated | Get links for poll. Query used is `poll_overview_related` |
 | QUERYGetPollFilterCount | Get poll result (votes are counted), conditions for filter result is also added here |
+| QUERYSetPollGroupCondition | Set poll group in query used to select polls |
+| QUERYGetLatestPoll | Get latest poll |
+| QUERYSetPollGroupCondition | Set poll group for polls displayed in page |
 | RESULTCreateFindVoter | Result from finding voter, this is called if user tries to login |
 | RESULTCreatePollOverview | Process result from  `poll_overview` that has information about active poll|
 | RESULTCreateVote | Process all answers from questions in poll o avoid to many requests to server  `poll_answer_all`|
@@ -100,7 +103,7 @@ export class CPageOne extends CPageSuper {
     * @type {number} m_oPoll.ip_count count votes for active ip number
     * @type {boolean} m_oPoll.comment if poll may have comments attached to vote information
     */
-   m_oPoll: { root_poll: number, poll: number, vote: number, count: number, tie: boolean, ip_count: number, comment: boolean };
+   m_oPoll: { root_poll: number, poll: number, poll_group: number, vote: number, count: number, tie: boolean, ip_count: number, comment: boolean };
    m_aQuestion: CQuestion[];
    m_oState: { [ key_name: string ]: string | number | boolean }; // States for page, may be used for outside actions
    m_sSearchMode: string;           // Search mode (this is top section in page), valid types are "hash", "field", "area", "personal"
@@ -119,7 +122,7 @@ export class CPageOne extends CPageSuper {
 
       this.m_bFilterConditionCount = false;
 
-      this.m_oPoll = { root_poll: -1, poll: -1, vote: -1, count: 0, tie: true, ip_count: 0, comment: false };
+      this.m_oPoll = { root_poll: -1, poll: -1, poll_group: -1, vote: -1, count: 0, tie: true, ip_count: 0, comment: false };
       this.m_sQueriesSet = o.set || "";
       this.m_sSession = o.session || null;
       this.m_oState = o.state || {};
@@ -156,6 +159,7 @@ export class CPageOne extends CPageSuper {
          "remove_filter": "Ta bort visning för",
          "filter_headers": "Fråga|Svar|Antal röster",
          "poll_not_found": "Vald omröstning hittades ej",
+         "poll_tree": "Anslutna omröstningar",
          "search_headers": "Namn|Beskrivning|Start|Slut",
          "search_orders": "new,Nya|old,Äldst",
          "search_snapshots": "all,Alla|yesno,Aktiva Ja/Nej frågor|active,Aktiva",
@@ -786,6 +790,10 @@ export class CPageOne extends CPageSuper {
       request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
    }
 
+   QUERYGetLatestPoll( iGroup: number ) {
+
+   }
+
    /**
     * result for selected poll
     * If data is found then get questions for poll
@@ -1084,8 +1092,9 @@ export class CPageOne extends CPageSuper {
 
          let eA = document.createElement("A");
          eA.setAttribute("href", sLink );
-         eA.className = "panel-block";
+         //eA.className = "panel-block";
          eA.setAttribute("target", "_blank");
+         eA.style.cssText = "display: flex; justify-content: flex-start; margin: 0em 1em;"
 
          const sImage = <string>oTD.CELLGetValue(iRow, "Image");
          if( sImage ) {
@@ -1292,7 +1301,14 @@ export class CPageOne extends CPageSuper {
       let iPoll = this.poll.poll;
       eA.addEventListener("click", click );
       eRoot.insertBefore( eA, eRoot.firstElementChild );
-      eRoot.appendChild( document.createElement("HR") );
+
+      let eSpan = document.createElement( "SPAN" );
+      eSpan.innerText = this.GetLabel("poll_tree");
+      eSpan.className = "is-pulled-right";
+      eSpan.style.cssText = "color: #c7c6c6; margin-right: 1em;";
+      eRoot.insertBefore( eSpan, eRoot.firstElementChild );
+
+      //eRoot.appendChild( document.createElement("HR") );
    }
 
    /**
@@ -1385,7 +1401,7 @@ export class CPageOne extends CPageSuper {
       let eQuestion;
 
       document.getElementById("idPollVoteMessage").classList.remove("is-active");
-      document.getElementById("idPollVote").classList.add("is-active");
+      //document.getElementById("idPollVote").classList.add("is-active");
       let oTD = new CTableData({ id: oResult.id, name: oResult.name });
       CPageSuper.ReadColumnInformationFromHeader(oTD, oResult.table.header);
       oTD.ReadArray(oResult.table.body, { begin: 0 });

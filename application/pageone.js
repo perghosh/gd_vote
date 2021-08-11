@@ -21,6 +21,9 @@ pageone = page logic for managing one vote, user can not select any votes. activ
 | QUERYGetSearch | Get search result for finding new vite |
 | QUERYGetPollRelated | Get links for poll. Query used is `poll_overview_related` |
 | QUERYGetPollFilterCount | Get poll result (votes are counted), conditions for filter result is also added here |
+| QUERYSetPollGroupCondition | Set poll group in query used to select polls |
+| QUERYGetLatestPoll | Get latest poll |
+| QUERYSetPollGroupCondition | Set poll group for polls displayed in page |
 | RESULTCreateFindVoter | Result from finding voter, this is called if user tries to login |
 | RESULTCreatePollOverview | Process result from  `poll_overview` that has information about active poll|
 | RESULTCreateVote | Process all answers from questions in poll o avoid to many requests to server  `poll_answer_all`|
@@ -66,7 +69,7 @@ export class CPageOne extends CPageSuper {
         const o = oOptions || {};
         this.m_oD3Bar = new CD3Bar();
         this.m_bFilterConditionCount = false;
-        this.m_oPoll = { root_poll: -1, poll: -1, vote: -1, count: 0, tie: true, ip_count: 0, comment: false };
+        this.m_oPoll = { root_poll: -1, poll: -1, poll_group: -1, vote: -1, count: 0, tie: true, ip_count: 0, comment: false };
         this.m_sQueriesSet = o.set || "";
         this.m_sSession = o.session || null;
         this.m_oState = o.state || {};
@@ -98,6 +101,7 @@ export class CPageOne extends CPageSuper {
             "remove_filter": "Ta bort visning för",
             "filter_headers": "Fråga|Svar|Antal röster",
             "poll_not_found": "Vald omröstning hittades ej",
+            "poll_tree": "Anslutna omröstningar",
             "search_headers": "Namn|Beskrivning|Start|Slut",
             "search_orders": "new,Nya|old,Äldst",
             "search_snapshots": "all,Alla|yesno,Aktiva Ja/Nej frågor|active,Aktiva",
@@ -675,6 +679,8 @@ export class CPageOne extends CPageSuper {
         let oCommand = { command: "delete_condition_from_query add_condition_to_query", query: "poll_search", set: this.queries_set, post: 1 };
         request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
     }
+    QUERYGetLatestPoll(iGroup) {
+    }
     /**
      * result for selected poll
      * If data is found then get questions for poll
@@ -931,8 +937,9 @@ export class CPageOne extends CPageSuper {
             const sName = oTD.CELLGetValue(iRow, "Name");
             let eA = document.createElement("A");
             eA.setAttribute("href", sLink);
-            eA.className = "panel-block";
+            //eA.className = "panel-block";
             eA.setAttribute("target", "_blank");
+            eA.style.cssText = "display: flex; justify-content: flex-start; margin: 0em 1em;";
             const sImage = oTD.CELLGetValue(iRow, "Image");
             if (sImage) {
                 let eImage = document.createElement("IMG");
@@ -1107,7 +1114,12 @@ export class CPageOne extends CPageSuper {
         let iPoll = this.poll.poll;
         eA.addEventListener("click", click);
         eRoot.insertBefore(eA, eRoot.firstElementChild);
-        eRoot.appendChild(document.createElement("HR"));
+        let eSpan = document.createElement("SPAN");
+        eSpan.innerText = this.GetLabel("poll_tree");
+        eSpan.className = "is-pulled-right";
+        eSpan.style.cssText = "color: #c7c6c6; margin-right: 1em;";
+        eRoot.insertBefore(eSpan, eRoot.firstElementChild);
+        //eRoot.appendChild( document.createElement("HR") );
     }
     /**
      * Generate table that lists all how many votes each answer has based on selected vote and filter
@@ -1183,7 +1195,7 @@ export class CPageOne extends CPageSuper {
     RESULTCreateQuestionPanel(eRoot, oResult) {
         let eQuestion;
         document.getElementById("idPollVoteMessage").classList.remove("is-active");
-        document.getElementById("idPollVote").classList.add("is-active");
+        //document.getElementById("idPollVote").classList.add("is-active");
         let oTD = new CTableData({ id: oResult.id, name: oResult.name });
         CPageSuper.ReadColumnInformationFromHeader(oTD, oResult.table.header);
         oTD.ReadArray(oResult.table.body, { begin: 0 });

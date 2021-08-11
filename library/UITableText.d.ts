@@ -57,7 +57,7 @@ declare namespace details {
             html_row_body_before?: string | string[];
             html_row_body_after?: string | string[];
             html_row_body_container?: string | string[];
-            html_value?: string;
+            html_value?: string | [number, string][];
             html_section_header?: string;
             html_section_body?: string;
             html_section_footer?: string;
@@ -133,7 +133,7 @@ export declare class CUITableText implements IUITableData {
         class_cell_input?: string;
         class_cell_selected?: string;
         html_header?: string;
-        html_value?: string;
+        html_value?: string | [number, string][];
     };
     m_eSupportElement: HTMLElement;
     m_aValueError: [number, number, unknown, unknown][];
@@ -233,6 +233,7 @@ export declare class CUITableText implements IUITableData {
     /** BLOG: querySelector
      * Return element for specified section.
      * Section elements are stored in array with section names, when section is created it is also stored. Array works as cache.
+     * Sample secitons could be "toolbar", "title", "header", "body", "footer", "statusbar". It depends on what sections is set to be created.
      * @param {string} sName name for section, valid names are found in this.m_aSection
      * @param {boolean} [bNoThrow] If true then return null if section isn't found
      * @returns {HTMLElement} Element for section or null if not found
