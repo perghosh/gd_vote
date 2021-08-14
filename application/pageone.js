@@ -983,10 +983,10 @@ export class CPageOne extends CPageSuper {
         oTD = new CTableData({ id: oResult.id, name: oResult.name });
         CPageSuper.ReadColumnInformationFromHeader(oTD, oResult.table.header);
         oTD.ReadArray(oResult.table.body, { begin: 0 });
-        oTD.COLUMNSetPropertyValue(["ID", "Ip", "Date", "Answer"], "position.hide", true);
+        oTD.COLUMNSetPropertyValue(["ID", "Ip", "Date", "Answer", "Question"], "position.hide", true);
         oTD.COLUMNSetPropertyValue("FComment", "alias", this.GetLabel("comments"));
         let oStyle = {
-            html_group: "table.table is-narrow is-fullwidth pointer",
+            html_group: "table.table is-narrow is-fullwidth",
             html_row: "tr",
             html_cell_header: "th",
             html_cell: "td",
@@ -1035,13 +1035,33 @@ export class CPageOne extends CPageSuper {
         oTD.UIAppend(oTT);
         oTT.COLUMNSetRenderer("Comment", function (eCell, value, a) {
             const iRow = a[0][0];
+            const sQuestion = this.data.CELLGetValue(iRow, "Question");
             const sDate = this.data.CELLGetValue(iRow, "Date");
             const sAnswer = this.data.CELLGetValue(iRow, "Answer");
-            eCell.innerHTML = `<div class="has-text-grey is-pulled-right" style="font-size: 80%;"><span style="margin-right: 0.5em;">${sDate}</span><span class="has-text-info" data-answer></span></div><div></div>`;
-            eCell.querySelector("[data-answer]").textContent = sAnswer;
-            eCell.firstElementChild.nextElementSibling.innerHTML = marked(value);
+            eCell.innerHTML =
+                `<div class="has-text-grey is-pulled-right" style="display: table; font-size: 80%;">
+      <span style="display: table-cell; padding-right:5px;">${sDate}</span>
+      <span style="cursor: pointer; display: table-cell; padding-right:5px; max-width: 100px; overflow: hidden; text-align: center; text-overflow: ellipsis; white-space: nowrap;" data-expand>${sQuestion}</span>
+      <span class="has-text-info" style="display: table-cell;">${sAnswer}</span>
+</div>
+<div data-comment></div>`;
+            //eCell.querySelector("[data-answer]").textContent = sAnswer;
+            eCell.querySelector("[data-comment]").innerHTML = marked(value);
         });
+        /*
+                 `<div class="has-text-grey is-pulled-right" style="displayfont-size: 80%;">
+                    <span style="display: inline-block; margin-right: 0.5em;">${sDate}</span>
+                    <span style="display: inline-block;  margin-right: 0.5em; max-width: 100px; overflow: hidden; text-align: center; text-overflow: ellipsis; white-space: nowrap;">${sQuestion}</span>
+                    <span class="has-text-info" style="display: inline-block;" data-answer></span>
+                 </div>
+                 <div></div>`;
+        
+         */
         oTT.Render();
+        oTT.GetSection("body").addEventListener("click", e => {
+            if (e.srcElement.hasAttribute("data-expand"))
+                e.srcElement.style.maxWidth = "unset";
+        });
         this.SNAPSHOTGetFor("poll_vote_comment");
         this.m_oUITableText.poll_vote_comments = oTT;
         eRoot.dataset.one = "1"; // You do not need to fill this again
