@@ -1018,7 +1018,8 @@ export class CPageOne extends CPageSuper {
       if( oQuestion.comment === true ) {                    // if comment is allowed in question
          TTVote.COLUMNSetRenderer(3, (e, value, a) => {
             if( e.tagName === "TEXTAREA") {
-               (<HTMLTextAreaElement>e).value = "";
+               //(<HTMLTextAreaElement>e).value = "";
+               (<HTMLTextAreaElement>e).value = value;
                return;
             } 
             e.className = "answer-comment";
