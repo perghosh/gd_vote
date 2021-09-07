@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<body>
+   <!-- 
+      test: http://localhost:8080/git/gd_vote/vote_simple.html?poll=47
+   -->
+
+   <div id="idPage" class="container" style="border:  3px solid #3aaa35; border-radius:  1em; padding: 1em;">
+      <div style="position: absolute; top: 1em; right: 1em; opacity: 0.1; max-width: 150px;">
+         <img src="res/icon_medium.jpg" alt="logo">
+      </div>
+
+      <div id="idUserMessage" data-section="information">
+         <div id="idError" data-message style="display: none;">
+            <div class="notification is-danger">
+              <pre></pre>
+              <button class="delete"></button>
+            </div>         
+         </div>
+         <div id="idMessage" data-message style="display: none;">
+            <div class="notification is-info">
+              <p></p>
+              <button class="delete"></button>
+            </div>         
+         </div>
+         <div id="idWarning" data-message style="display: none;">
+            <div class="notification is-warning">
+              <p></p>
+              <button class="delete"></button>
+            </div>         
+         </div>
+      </div>
+      <div id="idDebugMessage"></div>
+
+      <div id="idContent" class="box" data-section="content">
+
+
+
+
+         <!-- Vote section, here voter are able to vote, query = poll_question_list / poll_answer -->
+         <!-- <article id="idPollOverviewRelated" class="is-active is-size-5 has-text-weight-bold" data-index="1" style="color: #3aaa35;"></article> -->
+         <!-- 
+         <div style="border: 1px solid #3aaa35; border-radius: 15px; color: #000; margin-bottom: 1em;">
+            <div id="idResponsible" class="is-size-5 has-text-weight-bold" style="color: #c7c6c6; text-align: right; margin-bottom: 0.1em; margin-right: 1em;" data-translate="page.owner"></div>
+            <div id="idPollTitle" class="is-size-2 has-text-weight-bold" style="color: #3aaa35; text-align: right; margin-right: 1em;"></div>
+            <article id="idPollOverviewRelated" class="is-active is-size-5 has-text-weight-bold" data-index="1" style="border-bottom: 1px solid #c7c6c6; border-top: 1px solid #c7c6c6; margin: 0.5em;"></article>
+            <div id="idPollImage" style="display: block; text-align: center; margin-bottom: 1em;">
+            </div>
+         </div>
+         <article id="idPollVote" class="is-active" data-index="1" data-state="body.vote" style="border: 1px solid #3aaa35; border-radius: 15px; color: #000; padding: 1em;">
+         </article>
+         <article id="idPollVoteMessage" class="has-text-info is-size-4" data-index="1"></article>
+
+         <article id="idPollFilterCount" data-index="2" data-state="body.count">
+         </article>
+
+         <article id="idPollSearch" data-index="3" data-state="body.search" data-one="0">
+         </article>
+         -->
+
+         <!--
+| Id | Description |
+| - | - |            
+| idPollOverview | Overview, information about selected poll |
+| idPollQuestion | Question and answers for selected poll, each question can have description and one or more answers |
+| idPollSendVote | When voter is ready to send votes here is  |
+         -->
+
+         <div id="idVote" data-section="content">
+            <article id="idPollOverview">
+               <div class="text-title" data-type="name"></div>
+               <div class="text-body" data-type="description"></div>
+               <div class="" data-type="image"></div>
+               <div class="text-body" data-type="article"></div>
+            </article>
+            <article id="idPollQuestion">
+            </article>
+            <article id="idPollSendVote">
+            </article>
+            <article id="idPollLink">
+            </article>
+         </div>
+      </div>
+   </div>
+
+   <!-- HTML template for each questiion conatiner -->
+   <template id="template_question">
+      <div data-type="question" data-question="-1" style="border: solid black 1px;">
+         <header></header>
+         <article></article>
+      </div>
+   </template>
+
+   <!-- HTML template for vote button -->
+   <template id="template_vote">
+      <div data-type="answer" data-answer="-1" >
+         <a class="vote" href="javascript:void(0);" style="display: block; margin: 1em;">
+            <div data-type="name"></div>
+            <div data-type="description"></div>
+            <div data-type="picture"></div>
+         </a>
+      </div>
+   </template>
+
+   <script>
+      function PAGE_Setup() {
+         const [sSession,sAlias] = CPageSimple.HISTORYSerializeSession( false );
+         window.app = new CApplication({ callback_action: PAGE_Callback, session: sSession, alias: sAlias, protocol: window.location.protocol });
+         window.app.Initialize();
+
+         marked.setOptions({ breaks: true });        
+      }
+
+      /**
+       * Callback used by CPage class. CPage has the main page logic. Some logic is found here
+       * @param sMessage type of operation
+       */
+      function PAGE_Callback(sOperation, data) {
+         if( sOperation === "load" ) {                      // queries are loaded for user, here you can sart
+            // ## Get url parameters
+            // 
+            const sQueryString = window.location.search;
+            const oParams = new URLSearchParams(sQueryString);
+            if(oParams.has("debug") === true) {
+               this.state.debug = true;
+               window.app.debug = { debug: true, print: document.getElementById("idDebugMessage") };
+               if( this.state?.debug ) {
+                  const sSession = window.app.session;
+                  const sAlias = window.app.alias;
+                  const iPoll = window.app?.page.poll.poll || -1;
+                  let s = `session: ${sSession}, alias: ${sAlias}, poll: ${iPoll}`;
+                  window.app.debug.print.innerText = s;
+               }
+            }
+
+
+            if(oParams.has("poll") === false) {
+               this.OpenMessage("Saknar id till aktiv fråga");
+               return;
+            }
+
+            const iPoll = parseInt( oParams.get("poll"), 10 );
+            if(isNaN(iPoll)) {
+               this.OpenMessage("Felaktigt format för id till aktiv fråga");
+               return;
+            }
+
+            const sGroup = oParams.get("group");            // if group then set group to search query and hashtag query
+            if( sGroup === "1" ) this.state.set_poll_group = true;
+
+            this.SetActivePoll( iPoll );
+
+            const sLanguage = oParams.get("language");      // language parameter
+            if( sLanguage ) {
+               if( sLanguage == "1" ) window.app.request.Load(`translate.json`, "application/json", "set-language");
+               else window.app.request.Load(`translate_${sLanguage}.json`, "application/json", "set-language");
+            }
+         }
+         else if(sOperation === "select-poll") {
+         }
+         else if(sOperation === "select-poll-data") {
+         }
+         else if(sOperation === "server-session") {
+            if( !this.page) {
+               const sQuerySet = "vote";
+               this.m_oPage = new CPageSimple(this, {callback_action: PAGE_Callback, read_url: true, set: sQuerySet});
+               const sSession = window.app.request.session;
+               const sAlias = window.app.alias;
+               CPageSimple.HISTORYSerializeSession( true, sSession, sAlias );
+            }
+         }
+         else if( sOperation === "set-language" ) {
+            const oLanguage = JSON.parse( data.sResponseText );
+            window.app.page.TRANSLATEPage( oLanguage );
+         }
+         else if( sOperation === "js" ) {
+            let eScript = document.createElement('script');
+            eScript.innerHTML = data.sResponseText;
+            document.body.appendChild(eScript);
+         }
+         else if( sOperation === "debug" ) {
+            if( this.state?.debug ) {
+               const sSession = window.app.session;
+               const sAlias = window.app.alias;
+               const iPoll = window.app?.page.poll.poll || -1;
+               let s = `session: ${sSession}, alias: ${sAlias}, poll: ${iPoll}`;
+               window.app.debug.print.innerText = s;
+            }
+         }
+      }
+   </script>      
+
+   <script type="module">
+      import { edit } from "./library/TableDataEdit.js";
+      import { CTableData, browser } from "./library/TableData.js";
+      import { CTableDataTrigger } from "./library/TableDataTrigger.js";
+      import { SetTriggerName } from "./library/TableDataTriggerNames.js";
+      import { CUITableText } from "./library/UITableText.js";
+      import { CUIPagerPreviousNext } from "./library/UIPagerPreviousNext.js";
+      import { CDispatch } from "./library/Dispatch.js";
+
+      import { CRequest } from "./server/ServerRequest.js";
+      import { CQuery } from "./server/Query.js";
+
+      import { CApplication } from "./application/application.js";
+      import { CPageSimple } from "./application/pagesimple.js";
+      
+
+      window.edit = edit;
+      window.CTableData = CTableData;
+      window.CTableData_browser = browser;
+      window.CUITableText = CUITableText;
+      window.CTableDataTrigger = CTableDataTrigger;
+      window.CUIPagerPreviousNext = CUIPagerPreviousNext;
+      window.CDispatch = CDispatch;
+
+      window.CApplication = CApplication;
+      window.CPageSimple = CPageSimple;
+
+      SetTriggerName();
+
+      window.CRequest = CRequest;
+      window.CQuery = CQuery;
+
+      window.onerror = function(sMessage, sUrl, iLine) {
+         if(typeof sMessage === "string") {
+            sMessage += "\n" + sUrl + "\nLine: " + iLine;
+            window.app.page.OpenMessage(sMessage, "error");
+         }
+      };
+
+
+      document.addEventListener('DOMContentLoaded', function() {
+         PAGE_Setup();
+      });
+   </script>
+
+</body>
+<head>
+   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.1/css/bulma.min.css">
+   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma-helpers/0.4.0/css/bulma-helpers.min.css" integrity="sha512-U6ELnUi7oqVEjkLmFw5r5UR5LEtvpImS/jUykBKneVhD0lxZxfJZ3k3pe003ktrtNZYungd9u3Urp2X09wKwXg==" crossorigin="anonymous" />
+   <!-- fontawesome -->
+   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" integrity="sha512-iBBXm8fW90+nuLcSKlbmrPcLa0OT92xO1BIsZ+ywDWZCvqsWgccV3gFoRBv0z+8dLJgyAHIhR35VZc2oM/gI1w==" crossorigin="anonymous" />
+   <!-- markdown -->
+   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>   
+   <style>
+      :root {
+         --color-text:  #000000;
+         --color-primary: #e72b39;
+         --color-secondary: #39aa36;
+         --color-information: #39aa36;
+         --color-gray: #e9e9e9;
+         --color-gray-dark: #343a40;
+         --color-gray-light: #e9e8eb;
+         --color-white: #ffffff;
+
+         --color-success: #198754;
+         --color-warning: #ffc107;
+         --color-danger: #dc3545;
+
+         --color-background: #ffffff;
+
+         --color-vote_button: #e0e0e0;
+
+         --font-sans-serif: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+         --font-monospace: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      }
+
+      .text-title {
+         font-size: 1.5rem;
+         font-weight: 700;
+      }
+
+
+      a.vote {
+         border-radius: 8px;
+         padding-left: calc(1em + .25em);
+         padding-right: calc(1em + .25em);
+         border: 1px solid var( --color-gray );
+         color: var( --color-text );
+      }
+
+      a.vote.selected {
+         background-color:  var( --color-primary );
+         color: var( --color-white );
+      }
+
+
+      body {
+         color: #212529;
+         margin: 0;
+         font-family: var(--font-sans-serif);
+         font-size: 1rem;
+         font-weight: 400;
+         line-height: 1.5;
+         background-color: #fff;
+      }
+
+      header { 
+         font-weight: 700;
+      }
+
+      div[data-section="content"] > article {
+         display: none;
+      }
+
+      div[data-section="content"] > article.is-active {
+         display: block;
+      }
+
+   </style>
+</head>
+</html>

@@ -1,7 +1,7 @@
 import { CUITableText } from "./../library/UITableText.js";
 import { edit  } from "./../library/TableDataEdit.js";
 import { CRequest, EventRequest } from "./../server/ServerRequest.js";
-import { CPageOne } from "./pageone.js";
+import { CPageSuper } from "./pagesuper.js";
 
 namespace details {
    export type application_construct = {
@@ -9,6 +9,7 @@ namespace details {
       callback_action?: ((sMessage: string, data: any) => void);
       state?: { [key_name: string]: string|number|boolean } // state items for page
       session?: string;
+      protocol?: string;   // protocol used, http or https
       debug?: { debug: boolean, print: HTMLElement };
    }
 }
@@ -17,26 +18,34 @@ namespace details {
 export class CApplication {
    m_callAction: ((sMessage: string, data: any) => void);// callback array for action hooks
    m_sAlias: string;
-   m_oPage: CPageOne;
+   m_oPage: CPageSuper;
    m_oPageList: { [key_name: string]: object };
    m_sQueriesSet: string;
    m_oEditors: edit.CEditors;
    m_oRequest: CRequest;
    m_oDebug: { debug: boolean, print: HTMLElement };
+   m_sUrl: string;
 
+   // window.location.protocol
    constructor( oOptions?: details.application_construct ) {
       const o = oOptions || {};
       this.m_oDebug = o.debug || null;
       this.m_callAction = o.callback_action || null;
       this.m_oEditors = <edit.CEditors>edit.CEditors.GetInstance();
+
+      let sUrl = o.protocol || "http:";
+      sUrl += "//127.0.0.1:8882/jq.srf?";
+      // sUrl += "//goorep.se:1001/changelog/jq.srf?";
+      // sUrl += "//localhost:8080/so/jq.srf?";
+
+
+
       // Initialize CRequest for server communication
       this.m_oRequest = new CRequest({
          callback: CApplication.CallbackServer,
          folder: "rSelect",
          methods: { SYSTEM_Init: "l10", SYSTEM_GetUserData: "s03", SYSTEM_GetCountry: "s08", SCRIPT_Run: "f60", REPORT_Pdf: "r02" },
-         url: "http://127.0.0.1:8882/jq.srf?"
-         //url: "http://goorep.se:1001/changelog/jq.srf?"
-         //url: "http://localhost:8080/so/jq.srf?"
+         url: sUrl
       });
 
       this.m_sAlias = o.alias || "guest";                                       // change this based on what alias that is used
@@ -54,7 +63,7 @@ export class CApplication {
    get request() { return this.m_oRequest; }
    get session() { return this.m_oRequest.session; }
    get page() { return this.m_oPage; }
-   set page( oPage: CPageOne ) { this.m_oPage = oPage; }
+   set page( oPage: CPageSuper ) { this.m_oPage = oPage; }
    get queries_set() { return this.m_sQueriesSet; }
    set queries_set(s) { this.m_sQueriesSet = s; }
 
@@ -83,7 +92,7 @@ export class CApplication {
     * Initialize page information, user is verified and it is tome to collect information needed to render page markup
     */
    InitializePage( oState?: { [key_name: string]: string|number|boolean } ) {
-      this.m_oPage = new CPageOne(this, {callback_action: this.m_callAction});
+      //this.m_oPage = new CPageSuper(this, {callback_action: this.m_callAction});
    }
 
    AddPage(sName: string, oPage: any) {
@@ -101,7 +110,7 @@ export class CApplication {
       for(let i = 0; i < aItem.length; i++) {
          let eItem = aItem[ i ];
          const sName = eItem.getAttribute("name");
-         this.page.ProcessResponse(eItem, sName, sHint);
+         (<any>this.page).ProcessResponse(eItem, sName, sHint);
 
       }
    }

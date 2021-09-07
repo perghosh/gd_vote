@@ -12,11 +12,6 @@
    </label>
    -->
 
-<!-- 
-   https://versions.bulma.io/0.7.0/documentation/components/tabs/
-   hamburger: https://bulma.dev/classes/navbar/navbar-burger
-   https://www.geeksforgeeks.org/bulma-tabs/
--->
 
    <div id="idPage" class="container" style="border:  3px solid #3aaa35; border-radius:  1em; padding: 1em;">
       <div style="position: absolute; top: 1em; right: 1em; opacity: 0.1; max-width: 150px;">
@@ -60,9 +55,10 @@ JS: SetActiveState is used to switch state in page
       <div data-section="container" data-page-type="vote">
          <div id="idTabsMain" data-section="tab" class="tabs is-medium">
             <ul>
-               <li class="is-active" data-index="1"><a data-translate="page.vote">Rösta</a></li>
-               <li data-index="2"><a data-translate="page.result">Selektera röster</a></li>
-               <li data-index="3"><a data-translate="page.search">Sök omröstning</a></li>
+               <li class="is-active" data-index="1"><a data-translate="page.vote">STARTSIDA</a></li>
+               <li data-index="2"><a data-translate="page.about">OM KNAPPTRYCKARNA</a></li>
+               <li data-index="3"><a data-translate="page.search">OMRÖSTNINGAR</a></li>
+               <li data-index="4"><a data-translate="page.contact">KONTAKTA OSS</a></li>
             </ul>
          </div>
 
@@ -123,7 +119,7 @@ JS: SetActiveState is used to switch state in page
 
    <script>
       function PAGE_Setup() {
-         const [sSession,sAlias] = CPageOne.HISTORYSerializeSession( false );
+         const [sSession,sAlias] = CPageYesNo.HISTORYSerializeSession( false );
          window.app = new CApplication({ callback_action: PAGE_Callback, session: sSession, alias: sAlias, protocol: window.location.protocol });
          window.app.Initialize();
 
@@ -182,10 +178,10 @@ JS: SetActiveState is used to switch state in page
          else if(sOperation === "server-session") {
             if( !this.page) {
                const sQuerySet = "vote";
-               this.m_oPage = new CPageOne(this, {callback_action: PAGE_Callback, read_url: true, set: sQuerySet});
+               this.m_oPage = new CPageYesNo(this, {callback_action: PAGE_Callback, read_url: true, set: sQuerySet});
                const sSession = window.app.request.session;
                const sAlias = window.app.alias;
-               CPageOne.HISTORYSerializeSession( true, sSession, sAlias );
+               CPageYesNo.HISTORYSerializeSession( true, sSession, sAlias );
             }
          }
          else if(sOperation === "select-poll") {
@@ -335,7 +331,7 @@ JS: SetActiveState is used to switch state in page
       import { CQuery } from "./server/Query.js";
 
       import { CApplication } from "./application/application.js";
-      import { CPageOne } from "./application/pageone.js";
+      import { CPageYesNo } from "./application/pageyesno.js";
       
 
       //window.URLSearchParamsss = URLSearchParamsss;
@@ -350,7 +346,7 @@ JS: SetActiveState is used to switch state in page
 
       window.CApplication = CApplication;
       //window.CPageSuper = CPageSuper;
-      window.CPageOne = CPageOne;
+      window.CPageYesNo = CPageYesNo;
 
       SetTriggerName();
 

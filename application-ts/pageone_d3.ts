@@ -5,6 +5,8 @@
 
 // <reference path="./typings/modules/d3/index.d.ts" />
 
+import { CDispatch, IDispatch } from "./../library/Dispatch.js"
+
 declare var d3: any;
 
 namespace details {
@@ -36,20 +38,33 @@ namespace details {
 
    export type d3bar_construct = {
       dataset?: unknown[], 
+      dispatch?: CDispatch,      
+      id?: string,
    }
 }
 
-export class CD3Bar {
+export class CD3Bar implements IDispatch {
    m_aDataset: unknown[];
+   m_oDispatch?: CDispatch;   // dispatcher to deliver messages to owner
+   m_sId?: string;            // Unique id for CD3Bar bar
    m_aQuestion: details.question[]; 
+
+   static s_sWidgetName: string = "d3bar";
 
    constructor( oOptions?: details.d3bar_construct ) {
       const o = oOptions || {};
-
+      this.m_sId        = o.id || CD3Bar.s_sWidgetName + (new Date()).getUTCMilliseconds();
       this.m_aDataset = o.dataset || [];
+      this.m_oDispatch = o.dispatch || null;
 
       this.m_aQuestion = [];
    }
+
+   get name() { return "CD3Bar"; }
+   get id() { return this.m_sId; }
+   get dispatch() { return this.m_oDispatch; }              // get dispatcher if any connected
+   set dispatch(oDispatch: CDispatch) { this.m_oDispatch = oDispatch; }
+
 
    /**
     * Add question to D3 bar
@@ -192,13 +207,22 @@ export class CD3Bar {
       let g = d3Svg.append("g").attr("transform",`translate(${oMargin.left},${oMargin.top})`);   // add g element to svg
       g.append("g").call( d3.axisBottom( d3XScale ) ).attr("transform",`translate(0,${iHeightInner})`);
 
+      let fDblClick = (e) => {
+         let aAnswer = d3.select(e.srcElement).datum();
+         let aResult = this.dispatch.NotifyConnected(this, { command: "set_filter", data: { iAnswer: aAnswer[0] } });
+      };
+
       g.selectAll("rect").data(aAnswer)
          .enter()
          .append("rect")
+         .datum( a => a )
          .attr("y", a => d3YScale( a[1] ) )
          .attr("width", a => d3XScale( a[2] ) )
          .attr("height", a => d3YScale.bandwidth() )
          .attr("fill", "steelblue");
+
+      let oBars = g.selectAll("rect");
+      oBars.on("dblclick", fDblClick);
 
       if( bFilterValues ) {
          g = d3Svg.append("g").attr("transform",`translate(${oMargin.left},${oMargin.top})`);
@@ -206,6 +230,7 @@ export class CD3Bar {
          g.selectAll("rect").data(aAnswer)
             .enter()
             .append("rect")
+            .datum( a => a )
             .attr("y", a => d3YScale( a[1] ) )
             .attr("height", a => d3YScale.bandwidth() )
             .attr("width", 0 )
@@ -213,13 +238,17 @@ export class CD3Bar {
             .transition()
             .duration(2000)
             .attr("width", a => d3XScale( a[3] ) );
+
+         let oBars = g.selectAll("rect");
+         oBars.on("dblclick", fDblClick);
       }
 
       g = d3Svg.append("g");
       g.selectAll("text").data(aAnswer)
          .enter()
          .append("text")
-         .text(a => a[1])
+         .datum( a => a )
+         .text(a => a[1])   // a[1] has label text
          .attr("y", a => d3YScale( a[1] ) + (iHeightBar / 1.2)  )
          .attr("x", function( a ) {
             const  iWidth = this.getBBox().width;
@@ -240,6 +269,8 @@ export class CD3Bar {
             return "black";
          });
 
+      let oText = g.selectAll("text");
+      oText.on("dblclick", fDblClick);
    }
 
 
@@ -259,7 +290,7 @@ export class CD3Bar {
          .attr('width', "100%")
          .attr('height', "100%");
 
-      console.log( eContainer.firstElementChild.tagName );
+      //console.log( eContainer.firstElementChild.tagName );
 
       //Add bars to the generated svg element
       d3Svg.selectAll("rect")                               // create rect elements
@@ -291,54 +322,6 @@ export class CD3Bar {
         .attr("font-size", "12px")
         .attr("fill", "black");        
 
-/*
-.attr("fill", function(d) {
-  return "rgb(5, 2, " + (d * 10) + ")";
-});        
-*/
-
-/*
-      let d3Bar = d3Svg.selectAll("g.d3_bar")
-         .data( this.m_aDataset )
-         .enter().append("g")
-         .attr("class", "d3_bar");
-
-      d3Bar.append("text")
-          .attr("x", 12)
-          .attr("dy", "1.2em")
-          .attr("text-anchor", "left")
-          .text(function(a) { return a[1]; })
-          .style("fill", "#000000");
-
-      d3Bar.append("rect")
-         .attr("class", "malebar")
-         .attr("height", iHeight)
-         .attr("x", 10);                   
-         */
-/*
-      let d3Bar = d3BarArea.selectAll();                    
-      d3Bar = d3Bar.data(this.m_aDataset); 
-
-      d3Bar.enter().append("rect")
-         .style("fill", "#95c8d8")                          // set bar colors sky blue = "#95c8d8", air force = "#588bae"
-         .attr('x', 0)
-         .attr('y', (d,i)=>i*35)
-         .attr('height', 30)
-         .attr('width', a => { 
-            return a[2] * 6;
-         })
-         .append("text")
-         .attr("text-anchor", "end") 
-         .text( a => a[1] );
-
-         */
-/*
-      d3Bar.selectAll("text")
-         .data( this.m_aDataset )
-         .enter()
-         .append("text")
-         .text( a => a[1] );
-         */
    }
 
 

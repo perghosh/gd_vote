@@ -73,6 +73,7 @@ export class CPageSuper {
       oApplication.page = this;
 
       this.m_callAction = o.callback_action || null;
+
       this.m_oLabel = {};
 
    }
@@ -112,7 +113,6 @@ export class CPageSuper {
       (<HTMLElement>e.closest("[data-message]")).style.display = "block";
       window.scrollTo(0,0);
    }
-
 
    /**
     * Read column information from result header to columns in CTableData

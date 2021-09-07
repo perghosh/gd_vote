@@ -5,11 +5,15 @@ export declare type DispatchMessage = {
     data?: any;
 };
 export interface IDispatch {
-    id: string;
-    name: string;
-    on: ((oMessage: DispatchMessage, sender: string | IDispatch) => any);
+    id?: string;
+    name?: string;
+    on?: ((oMessage: DispatchMessage, sender: string | IDispatch) => any);
     destroy?: (() => void);
 }
+/**
+ * Object used to connect objects for communication
+ * Objects needs to implement "on" and "destroy" methods to work with dispatch
+ */
 export declare class CDispatch {
     m_aListeners: IDispatch[];
     m_oChain: {

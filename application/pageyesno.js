@@ -63,13 +63,11 @@ import { CUITableText } from "./../library/UITableText.js";
 import { CQuery } from "./../server/Query.js";
 import { CPageSuper, CQuestion, CPageState } from "./pagesuper.js";
 import { CD3Bar } from "./pageone_d3.js";
-export class CPageOne extends CPageSuper {
+export class CPageYesNo extends CPageSuper {
     constructor(oApplication, oOptions) {
         super(oApplication, oOptions);
         const o = oOptions || {};
-        this.m_oDispatch = new CDispatch();
-        this.m_oD3Bar = new CD3Bar({ dispatch: this.m_oDispatch });
-        this.m_oDispatch.AddChain(this.m_oD3Bar, this); // connect pager with ui table
+        this.m_oD3Bar = new CD3Bar();
         this.m_bFilterConditionCount = false;
         this.m_oPoll = { root_poll: -1, poll: -1, poll_group: -1, vote: -1, count: 0, tie: true, ip_count: 0, comment: false };
         this.m_sQueriesSet = o.set || "";
@@ -119,6 +117,10 @@ export class CPageOne extends CPageSuper {
         if (o.label) {
             this.TRANSLATEPage();
         }
+        /*
+              let eEditors = edit.CEditors.GetInstance();
+              eEditors.Add("string", edit.CEditInput);
+        */
     }
     get poll() { return this.m_oPoll; }
     get queries_set() { return this.m_sQueriesSet; }
@@ -307,6 +309,19 @@ export class CPageOne extends CPageSuper {
         }
     }
     /**
+     * Close markup elements in page that is related to state and  selected poll questions
+     */
+    CloseQuestions() {
+        let e;
+        this.m_aQuestion = [];
+        document.getElementById("idPollVote").innerHTML = "";
+        document.getElementById("idPollFilterCount").innerHTML = "";
+        e = document.getElementById("idPollImage");
+        e.innerHTML = "";
+        e.style.display = "none";
+        this.OpenMessage(); // close any open message
+    }
+    /**
      * Is Poll ready to send  to server to register vote for voter?
      * @param {boolean} [bUpdateVoteButton] Update button in page
      * @returns {boolean} true if questions are ready to be sent to server, false if not
@@ -383,19 +398,6 @@ export class CPageOne extends CPageSuper {
         let request = this.app.request;
         request.Get("SCRIPT_Run", { file: "PAGE_result_edit.lua", json: request.GetJson(oCommand) }, sXml);
         this.poll.vote = this.poll.poll; // keep poll index for later when response from server is returned
-    }
-    /**
-     * Close markup elements in page that is related to state and  selected poll questions
-     */
-    CloseQuestions() {
-        let e;
-        this.m_aQuestion = [];
-        document.getElementById("idPollVote").innerHTML = "";
-        document.getElementById("idPollFilterCount").innerHTML = "";
-        e = document.getElementById("idPollImage");
-        e.innerHTML = "";
-        e.style.display = "none";
-        this.OpenMessage(); // close any open message
     }
     /**
      * Process server response
@@ -803,7 +805,7 @@ export class CPageOne extends CPageSuper {
         // add to our voter count chart data
         for (let i = 0, iTo = TDVote.ROWGetCount(); i < iTo; i++) {
             this.m_oD3Bar.AddAnswer(iQuestion, [
-                TDVote.CELLGetValue(i, "ID_Answer"),
+                TDVote.CELLGetValue(i, "PollAnswerK"),
                 TDVote.CELLGetValue(i, "FName"),
                 0, 0
             ]);
@@ -1268,9 +1270,8 @@ export class CPageOne extends CPageSuper {
         // let aCondition: details.condition[] = [];
         aBody.forEach((aRow, i) => {
             // For each question in poll we add one condition to page state to return answers for that question where user are able to vote for one or more.
-            const iQuestion = aRow[0]; // Question key "PollQuestionK"
+            const iQuestion = aRow[0]; // Question key
             const sName = aRow[1];
-            const sDescription = aRow[6] || ""; // "FDescription"
             const iPollIndex = i + 1; // Index for poll query
             // aCondition.push( { ready: false, table: "TPollQuestion1", id: "PollQuestionK", value: iQuestion} ); // TODO
             if (eRoot) {
@@ -1280,7 +1281,7 @@ export class CPageOne extends CPageSuper {
                 eSection.className = "block";
                 eSection.style.margin = "0em 1em";
                 if (this.view_mode === "vote") {
-                    eSection.innerHTML = `<header class="title is-3" style="margin-bottom: 0.5em;"><div>${iPollIndex}: ${sName}</div><div class="has-text-weight-normal is-italic is-size-5 pl-6">${sDescription}</div></header><article style="display: block;"></article>`;
+                    eSection.innerHTML = `<header class="title is-3">${iPollIndex}: ${sName}</header><article style="display: block;"></article>`;
                 }
                 else {
                     eSection.innerHTML = `<header class="title is-5 pointer" style="margin-bottom: 0.5em;" data-open="1">${iPollIndex}: ${sName}</header><article style="display: block;"></article>`;
@@ -1366,7 +1367,7 @@ export class CPageOne extends CPageSuper {
         // add to our voter count chart data
         for (let i = 0, iTo = oTD.ROWGetCount(); i < iTo; i++) {
             this.m_oD3Bar.AddAnswer(iQuestion, [
-                oTD.CELLGetValue(i, "ID_Answer"),
+                oTD.CELLGetValue(i, "PollAnswerK"),
                 oTD.CELLGetValue(i, "FName"),
                 //Math.floor(Math.random() * 100),
                 0,
@@ -1403,42 +1404,20 @@ export class CPageOne extends CPageSuper {
         oTT.Render();
         eSection = oTT.GetSection("body");
         eSection.addEventListener("click", (e) => {
-            this.CONDITIONTToggleFilter(e.srcElement);
-            /*
-            const eButton = <HTMLElement>e.srcElement;
-            if( eButton.tagName === "BUTTON" ) {
-               if( typeof eButton.dataset.uuid === "string" ) {
-                  this.QUERYGetPollFilterCount({ condition: eButton.dataset.uuid });
-                  eButton.className = "button is-primary is-light is-small";
-                  eButton.innerText = this.GetLabel("add_filter");
-                  delete eButton.dataset.uuid;
-               }
-               else {
-                  const iAnswer = parseInt( eButton.dataset.answer, 10 );
-                  this.QUERYGetPollFilterCount({ answer: iAnswer });
-               }
+            const eButton = e.srcElement;
+            if (eButton.tagName === "BUTTON") {
+                if (typeof eButton.dataset.uuid === "string") {
+                    this.QUERYGetPollFilterCount({ condition: eButton.dataset.uuid });
+                    eButton.className = "button is-primary is-light is-small";
+                    eButton.innerText = this.GetLabel("add_filter");
+                    delete eButton.dataset.uuid;
+                }
+                else {
+                    const iAnswer = parseInt(eButton.dataset.answer, 10);
+                    this.QUERYGetPollFilterCount({ answer: iAnswer });
+                }
             }
-            */
         });
-    }
-    /**
-     * Toggle filter and render filter button for selected answer
-     * @param {number | HTMLElement} _Answer number of element for answer
-     */
-    CONDITIONTToggleFilter(_Answer) {
-        const eButton = (typeof _Answer === "number" ? document.querySelector(`button[data-answer="${_Answer}"]`) : _Answer);
-        if (eButton.tagName === "BUTTON") {
-            if (typeof eButton.dataset.uuid === "string") {
-                this.QUERYGetPollFilterCount({ condition: eButton.dataset.uuid });
-                eButton.className = "button is-primary is-light is-small";
-                eButton.innerText = this.GetLabel("add_filter");
-                delete eButton.dataset.uuid;
-            }
-            else {
-                const iAnswer = parseInt(eButton.dataset.answer, 10);
-                this.QUERYGetPollFilterCount({ answer: iAnswer });
-            }
-        }
     }
     RESULTCreateVoteCountAndFilter(eRoot, oResult) {
         if (typeof eRoot === "string")
@@ -1662,24 +1641,6 @@ export class CPageOne extends CPageSuper {
     }
     static HISTORYSerializeSession(bSave, sSession, sAlias) {
         return CPageSuper.SerializeSession(bSave, sSession, sAlias);
-        /*
-        if( bSave === true ) {
-           const oSession = { time: (new Date()).toISOString(), session: sSession, alias: sAlias };
-           localStorage.setItem( "session", JSON.stringify( oSession ) );
-        }
-        else {
-           const sSession = localStorage.getItem("session");
-           if( sSession ) {
-              const oSession: { time: string, session: string, alias: string } = JSON.parse( sSession );
-              // Compare date, if older than one hour then skip
-              const iDifference: any = <any>(new Date()) - Date.parse(oSession.time);
-              if( iDifference <  10000000 ) {
-                 return [oSession.session,oSession.alias];
-              }
-           }
-        }
-        return [null,null];
-        */
     }
     /**
      * Mark condition, user need to know what is filtered on
@@ -1838,20 +1799,6 @@ export class CPageOne extends CPageSuper {
             let oPager = this.GENERATEPager(eContainer, oTT, oDispatch);
             oDispatch.AddChain(oPager, oTT); // connect pager with ui table
             oDispatch.AddChain(oTT, [oPager]); // connect ui table with pager
-        }
-    }
-    /**
-     * Collect dispatch messages here for connected components
-     * @param oMessage
-     * @param sender
-     */
-    on(oMessage, sender) {
-        const [sCommand, sType] = oMessage.command.split(".");
-        switch (sCommand) {
-            case "set_filter":
-                let iAnswer = oMessage.data.iAnswer;
-                this.CONDITIONTToggleFilter(iAnswer);
-                break;
         }
     }
     /**

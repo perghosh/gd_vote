@@ -1,20 +1,22 @@
 import { edit } from "./../library/TableDataEdit.js";
 import { CRequest } from "./../server/ServerRequest.js";
-import { CPageOne } from "./pageone.js";
 export class CApplication {
+    // window.location.protocol
     constructor(oOptions) {
         const o = oOptions || {};
         this.m_oDebug = o.debug || null;
         this.m_callAction = o.callback_action || null;
         this.m_oEditors = edit.CEditors.GetInstance();
+        let sUrl = o.protocol || "http:";
+        sUrl += "//127.0.0.1:8882/jq.srf?";
+        // sUrl += "//goorep.se:1001/changelog/jq.srf?";
+        // sUrl += "//localhost:8080/so/jq.srf?";
         // Initialize CRequest for server communication
         this.m_oRequest = new CRequest({
             callback: CApplication.CallbackServer,
             folder: "rSelect",
             methods: { SYSTEM_Init: "l10", SYSTEM_GetUserData: "s03", SYSTEM_GetCountry: "s08", SCRIPT_Run: "f60", REPORT_Pdf: "r02" },
-            url: "http://127.0.0.1:8882/jq.srf?"
-            //url: "http://goorep.se:1001/changelog/jq.srf?"
-            //url: "http://localhost:8080/so/jq.srf?"
+            url: sUrl
         });
         this.m_sAlias = o.alias || "guest"; // change this based on what alias that is used
         this.m_sQueriesSet = "vote";
@@ -54,7 +56,7 @@ export class CApplication {
      * Initialize page information, user is verified and it is tome to collect information needed to render page markup
      */
     InitializePage(oState) {
-        this.m_oPage = new CPageOne(this, { callback_action: this.m_callAction });
+        //this.m_oPage = new CPageSuper(this, {callback_action: this.m_callAction});
     }
     AddPage(sName, oPage) {
         this.m_oPageList[sName] = oPage;

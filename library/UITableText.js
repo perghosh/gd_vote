@@ -197,7 +197,7 @@ export class CUITableText {
         }
     }
     /**
-     *
+     * Collect dispatch messages here for connected components
      * @param oMessage
      * @param sender
      */
@@ -1271,11 +1271,12 @@ export class CUITableText {
         return eSection;
     }
     render_body(_1, eSection) {
+        let EVT = this._get_triggerdata();
         eSection = eSection || this.GetSection("body");
         let aResult;
-        //let sClass: string = <string>CTableData.GetPropertyValue(this.m_oStyle, false, "class_value") || "";
         let aStyle = this.data.COLUMNGetPropertyValue(this.m_aColumnPhysicalIndex, "style", true); // position data for columns
         const bSetValue = this.is_state(8 /* SetValue */); // If try to set value for html element, when you have INPUT elements in column.
+        const bSetElementIfValue = this.is_state(64 /* SetElementIfValue */);
         if (Array.isArray(_1)) {
             aResult = _1;
             this.SetCellError(); // clear errors
@@ -1285,6 +1286,7 @@ export class CUITableText {
         if (eSection === null)
             return;
         let bCall = this._has_render_callback("askCellValue", "body");
+        const bCancelRowRender = this.is_state(128 /* CancelRowRender */);
         let eRow = eSection.firstElementChild;
         if (eRow === null)
             return;
@@ -1321,7 +1323,6 @@ export class CUITableText {
                 let eColumn = eR.firstElementChild;
                 const iTo = aColumn.length;
                 for (let i = 0; i < iTo; i++) {
-                    //aColumn.forEach(iC => { 
                     const iC = this._column_in_ui(aColumn[i]); // index to column in table data
                     let e = this.ELEMENTGetCellValue(eColumn); // get cell value element
                     let sValue = aRow[iC]; // value for active cell
@@ -1331,13 +1332,17 @@ export class CUITableText {
                     if (bCall) {
                         let bRender = true;
                         for (let j = 0; j < this.m_acallRender.length; j++) {
-                            let b = this.m_acallRender[j].call(this, "beforeCellValue", sValue, eColumn, oColumn);
+                            EVT.eElement = e;
+                            EVT.information = sValue;
+                            let b = this.m_acallRender[j].call(this, "beforeCellValue", EVT, "body", oColumn);
                             if (b === false)
                                 bRender = false;
                         }
                         if (bRender === false)
                             continue;
                     }
+                    if (bCancelRowRender)
+                        continue;
                     if (Object.keys(aStyle[i][1]).length > 0)
                         Object.assign(e.style, aStyle[i][1]);
                     if (bSetValue === false) {
@@ -1367,6 +1372,8 @@ export class CUITableText {
                             if (sValue !== null && sValue != void 0) {
                                 if ("value" in e) {
                                     e.setAttribute("value", sValue.toString());
+                                    if (bSetElementIfValue)
+                                        e.innerText = sValue.toString(); // also set element value if state "SetElementIfValue" is set. LI element is one sample
                                 }
                                 else
                                     e.innerText = sValue.toString();
@@ -1782,6 +1789,7 @@ export class CUITableText {
         };
         //      let sClass: string;
         let sStyle = CTableData.GetPropertyValue(this.m_oStyle, false, "value") || null;
+        let _HtmlRowComplete = CTableData.GetPropertyValue(this.m_oStyle, false, "html_row_complete");
         let _HtmlRow = CTableData.GetPropertyValue(this.m_oStyle, false, "html_row_body") || CTableData.GetPropertyValue(this.m_oStyle, false, "html_row") || "div";
         let _HtmlBefore = CTableData.GetPropertyValue(this.m_oStyle, false, "html_row_body_before") || _HtmlRow;
         let _HtmlAfter = CTableData.GetPropertyValue(this.m_oStyle, false, "html_row_body_after") || _HtmlRow;
@@ -1793,13 +1801,6 @@ export class CUITableText {
         if (typeof _HtmlValue === "string")
             _HtmlValue = _HtmlValue.trim();
         this.set_state(_HtmlValue, 1 /* HtmlValue */); // set state if cell is a dom tree or not
-        /*
-              if(!sHtmlCell) sHtmlCell = "span";                                       // span is default element for values
-              if( sHtmlCell.indexOf(".") !== -1 ) {
-                 let a = sHtmlCell.split(".");
-                 if(a.length > 1) [ sHtmlCell, sClass ] = a;                           // element for value, this can be element name and class if format is in "element_name.class_names" like "span.value".
-              }
-        */
         let set_row_attr = (eRow, iRow, aColumn, _HtmlCell, _HtmlValue, sStyle) => {
             eRow.dataset.r = iRow.toString();
             eRow.dataset.c_row = "C" + aColumn.join(",C") + ",";
@@ -1869,12 +1870,16 @@ export class CUITableText {
         const oRowRows = this.m_oRowRows || this.data.GetRowRows(); // get temporary CRowRows object, do not store this. Works only as CTableData isn't modified
         let eFragment = document.createDocumentFragment(); // fragment used to collect markup that is added to table, markup is cloned into page
         let eContainer;
-        let aRowMain = this._create_row(_HtmlRow);
+        let aRowMain = _HtmlRowComplete ? this._create_row(_HtmlRowComplete) : this._create_row(_HtmlRow);
         let aContainer;
         if (_HtmlContainer) {
             aContainer = this._create_container(_HtmlContainer);
             eContainer = aContainer[1];
             eFragment.appendChild(aContainer[0]);
+        }
+        else if (_HtmlRowComplete) {
+            eFragment.appendChild(aRowMain[0]);
+            eContainer = eFragment;
         }
         else {
             eContainer = eFragment;
@@ -1950,30 +1955,61 @@ export class CUITableText {
     }
     /**
      * Create row or row "row-tree" of elements from string or array with strings
-     * @param {string | string[]} aRow element names for row tree
+     * @param {string | string[]} aRow element names for row tree. If row is array the first array element
+     * is used as class and second is used as style
      */
     _create_row(aRow) {
-        if (!Array.isArray(aRow))
+        if (typeof aRow === "string")
             aRow = [aRow];
-        let eRoot = null, eRow, eParent;
-        for (let i = 0; i < aRow.length; i++) {
-            const a = this._split(aRow[i]); //   aRow[i].split(".");
-            eRow = document.createElement(a[0]);
-            if (eParent)
-                eParent.appendChild(eRow);
-            if (a.length > 1) {
-                eRow.className = a[1];
+        // let eRoot: HTMLElement = null, eRow: HTMLElement, eParent: HTMLElement;
+        let fCreateFromElement = (eRow) => {
+            let eMarkup = aRow.content.cloneNode(true);
+            let e = eMarkup.firstElementChild;
+            e.dataset.type = "row";
+            return [e, e];
+        };
+        let fCreateFromArray = (aRow) => {
+            let eRoot = null, eRow, eParent;
+            for (let i = 0; i < aRow.length; i++) {
+                const a = this._split(aRow[i]); //   aRow[i].split(".");
+                eRow = document.createElement(a[0]);
+                if (eParent)
+                    eParent.appendChild(eRow);
+                if (a.length > 1) {
+                    eRow.className = a[1];
+                }
+                if (a.length > 2) {
+                    eRow.style.cssText = a[2];
+                }
+                if (eRoot === null) {
+                    eRoot = eRow;
+                }
+                eParent = eRow; // parent is always the last row created, may be used when rows has a tree markup
             }
-            if (a.length > 2) {
-                eRow.style.cssText = a[2];
-            }
-            if (eRoot === null) {
-                eRoot = eRow;
-            }
-            eParent = eRow;
+            eRow.dataset.type = "row";
+            return [eRoot, eRow];
+        };
+        if (typeof aRow !== "string" && Array.isArray(aRow) === false) {
+            return fCreateFromElement(aRow);
         }
-        eRow.dataset.type = "row";
-        return [eRoot, eRow];
+        return fCreateFromArray(aRow);
+        /*
+              for( let i = 0; i < aRow.length; i++ ) {
+                 const a = this._split( aRow[i] ); //   aRow[i].split(".");
+                 eRow = document.createElement(a[0]);
+                 if( eParent ) eParent.appendChild( eRow );
+                 if( a.length > 1 ) { eRow.className = a[1]; }
+                 if( a.length > 2 ) { eRow.style.cssText = a[2]; }
+        
+                 if( eRoot === null ) {
+                    eRoot = eRow;
+                 }
+                 eParent = eRow; // parent is always the last row created, may be used when rows has a tree markup
+              }
+        
+              eRow.dataset.type = "row";
+              return [eRoot,eRow];
+              */
     }
     /**
      * Types of row layouts that are managed

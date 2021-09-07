@@ -1,3 +1,7 @@
+/**
+ * Object used to connect objects for communication
+ * Objects needs to implement "on" and "destroy" methods to work with dispatch
+ */
 export class CDispatch {
     constructor() {
         this.m_aListeners = [];

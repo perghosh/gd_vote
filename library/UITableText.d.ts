@@ -8,7 +8,9 @@ export declare const enum enumState {
     SetHistory = 4,
     SetValue = 8,
     SetOneClickActivate = 16,
-    DisableFocus = 32
+    DisableFocus = 32,
+    SetElementIfValue = 64,
+    CancelRowRender = 128
 }
 declare namespace details {
     type construct = {
@@ -52,6 +54,7 @@ declare namespace details {
             html_cell?: string | string[];
             html_cell_header?: string;
             html_cell_footer?: string;
+            html_row_complete?: string | HTMLElement;
             html_row?: string | string[];
             html_row_body?: string | string[];
             html_row_body_before?: string | string[];
@@ -199,7 +202,7 @@ export declare class CUITableText implements IUITableData {
      */
     update(iType: number): any;
     /**
-     *
+     * Collect dispatch messages here for connected components
      * @param oMessage
      * @param sender
      */
@@ -480,9 +483,10 @@ export declare class CUITableText implements IUITableData {
     _create_container(aContainer: string | string[]): [HTMLElement, HTMLElement];
     /**
      * Create row or row "row-tree" of elements from string or array with strings
-     * @param {string | string[]} aRow element names for row tree
+     * @param {string | string[]} aRow element names for row tree. If row is array the first array element
+     * is used as class and second is used as style
      */
-    _create_row(aRow: string | string[]): [HTMLElement, HTMLElement];
+    _create_row(aRow: string | string[] | HTMLTemplateElement): [HTMLElement, HTMLElement];
     /**
      * Types of row layouts that are managed
      * 1: <main row>
