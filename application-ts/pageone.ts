@@ -948,6 +948,7 @@ export class CPageOne extends CPageSuper {
       CTableData.SetPropertyValue(aColumn, true, "edit.name", "checkbox");
       CTableData.SetPropertyValue(aColumn, true, "edit.edit", true);
       CTableData.SetPropertyValue(aColumn, true, "edit.element", 1);
+      
       TDVote.COLUMNSetPropertyValue("FName", "alias", aHeaderText[1]);
       TDVote.COLUMNSetPropertyValue("FDescription", "alias", aHeaderText[2]);
 
