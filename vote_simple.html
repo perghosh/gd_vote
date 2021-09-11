@@ -5,10 +5,14 @@
       test: http://localhost:8080/git/gd_vote/vote_simple.html?poll=47
    -->
 
-   <div id="idPage" class="container" style="border:  3px solid #3aaa35; border-radius:  1em; padding: 1em;">
+   <div id="idPage" class="container" style="padding: 1em;">
+      <!--
+         
+      <div id="idPage" class="container" style="border:  3px solid #3aaa35; border-radius:  1em; padding: 1em;">
       <div style="position: absolute; top: 1em; right: 1em; opacity: 0.1; max-width: 150px;">
          <img src="res/icon_medium.jpg" alt="logo">
       </div>
+      -->
 
       <div id="idUserMessage" data-section="information">
          <div id="idError" data-message style="display: none;">
@@ -67,15 +71,18 @@
          -->
 
          <div id="idVote" data-section="content">
+            <div id="idPollQuestionList" class="element-hide element-pad" style="text-align: right;">
+               <select class="button-super button-select" data-type="list"></select>
+            </div>
             <article id="idPollOverview">
-               <div class="text-title" data-type="name"></div>
+               <div class="text-title-primary" data-type="name" ></div>
                <div class="text-body" data-type="description"></div>
                <div class="" data-type="image"></div>
-               <div class="text-body" data-type="article"></div>
+               <div class="text-body element-pad" data-type="article"></div>
             </article>
             <article id="idPollQuestion">
             </article>
-            <article id="idPollSendVote">
+            <article id="idPollSendVote" style="padding-top: 1em;">
             </article>
             <article id="idPollLink">
             </article>
@@ -85,8 +92,8 @@
 
    <!-- HTML template for each questiion conatiner -->
    <template id="template_question">
-      <div data-type="question" data-question="-1" style="border: solid black 1px;">
-         <header></header>
+      <div data-type="question" data-question="-1" style="">
+         <header style="font-size: 20pt; margin: 1em;"></header>
          <article></article>
       </div>
    </template>
@@ -94,10 +101,12 @@
    <!-- HTML template for vote button -->
    <template id="template_vote">
       <div data-type="answer" data-answer="-1" >
-         <a class="vote" href="javascript:void(0);" style="display: block; margin: 1em;">
-            <div data-type="name"></div>
-            <div data-type="description"></div>
-            <div data-type="picture"></div>
+         <a class="vote" href="javascript:void(0);" style="display: flex; margin: 1em; min-height: 3em; align-items: center; justify-content: center; ">
+            <div>
+               <div data-type="name" style="font-size: 140%; font-weight: 500; text-align: center;"></div>
+               <div data-type="description" style="text-align: center;"></div>
+               <div data-type="picture"></div>
+            </div>
          </a>
       </div>
    </template>
@@ -188,6 +197,33 @@
             }
          }
       }
+
+      // handle close button in message section
+      let eUserMessage = document.getElementById("idUserMessage");
+      eUserMessage.addEventListener("click", e => { 
+         if( e.srcElement.tagName === "BUTTON") {
+            let eMessage = e.srcElement.closest("[data-message]");
+            eMessage.style.display = "none"; 
+         }
+      });
+
+      document.getElementById("idPollQuestionList").querySelector(`[data-type="list"]`).addEventListener("change", e => {
+         let eSelect = document.getElementById("idPollQuestionList").querySelector("select");
+         eSelect.querySelectorAll("option").forEach( e => {
+            e.classList.remove("selected");
+         });
+         const iPoll = parseInt(e.target.value, 10);
+         if(isNaN(iPoll)) { app.page.SetActivePoll(-1); }
+         else { window.app.page.SetActivePoll( iPoll ); }        
+
+         for( let i = 0; i < eSelect.options.length; ++i) {
+            if(eSelect.options[i].value === iPoll.toString() ) {
+               eSelect.options[i].classList.add("selected");  break;
+            } 
+         }            
+
+      });
+      
    </script>      
 
    <script type="module">
@@ -224,8 +260,15 @@
 
       window.onerror = function(sMessage, sUrl, iLine) {
          if(typeof sMessage === "string") {
+            let oPage = window.app.page;
+            let iLabel = sMessage.indexOf("%%");
+            if(iLabel !== -1 && sMessage.length < 110 ) {
+               sMessage = sMessage.substr( iLabel );
+               oPage.OpenMessage( oPage.GetLabel(sMessage), "error" )
+               return;
+            }
             sMessage += "\n" + sUrl + "\nLine: " + iLine;
-            window.app.page.OpenMessage(sMessage, "error");
+            oPage.OpenMessage(sMessage, "error");
          }
       };
 
@@ -253,6 +296,7 @@
          --color-gray-dark: #343a40;
          --color-gray-light: #e9e8eb;
          --color-white: #ffffff;
+         --color-black: #000000;
 
          --color-success: #198754;
          --color-warning: #ffc107;
@@ -262,8 +306,22 @@
 
          --color-vote_button: #e0e0e0;
 
+         --color-red: #e72b39;
+         --color-green: #39aa36;
+
          --font-sans-serif: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
          --font-monospace: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      }
+
+      .element-hide {
+         display:  none;
+      }
+
+      .element-pad {
+         padding-bottom: calc(.5em - 1px);
+         padding-left: 1em;
+         padding-right: 1em;
+         padding-top: calc(.5em - 1px);
       }
 
       .text-title {
@@ -271,17 +329,69 @@
          font-weight: 700;
       }
 
+      .text-title-primary {
+         display: none;
+         font-size: 1.5rem;
+         font-weight: 700;
+         background-color: var( --color-primary );
+         color: var( --color-white);
+      }
 
+      /* base settings for buttons */
+      .button-super {
+         cursor: pointer;
+         justify-content: center;
+         padding-bottom: calc(.5em - 1px);
+         padding-left: 1em;
+         padding-right: 1em;
+         padding-top: calc(.5em - 1px);
+         text-align: center;
+      }
+
+      .button-select {
+         border-radius: 5px;
+         border:  solid var(--color-green) 2px;
+         font-size: 125%;
+      }
+
+      .vote-send {
+         background-color: var(--color-green);
+         border-radius: 5px;
+         color: var(--color-white);
+         display: block;
+         font-size: 175%;
+         margin: 0.5em;
+         text-align: center;
+      }
+
+      .vote-send-block {
+         background-color: var(--color-red);
+         border-radius: 5px;
+         color: var(--color-white);
+         display: block;
+         font-size: 175%;
+         margin: 0.5em;
+         text-align: center;
+      }
+
+      .vote-send[disabled] {
+         box-shadow: none;
+         opacity: .5;
+         cursor: not-allowed;
+      }
+
+
+      /* vote buttons */
       a.vote {
-         border-radius: 8px;
-         padding-left: calc(1em + .25em);
-         padding-right: calc(1em + .25em);
+         border-radius: 5px;
          border: 1px solid var( --color-gray );
+         background-color: var(--color-gray);
          color: var( --color-text );
       }
 
+      /* used for selected votes */
       a.vote.selected {
-         background-color:  var( --color-primary );
+         background-color:  var( --color-black );
          color: var( --color-white );
       }
 
@@ -306,6 +416,10 @@
 
       div[data-section="content"] > article.is-active {
          display: block;
+      }
+
+      option.selected {
+         font-weight: 700;
       }
 
    </style>

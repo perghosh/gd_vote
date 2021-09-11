@@ -127,12 +127,14 @@ export class CApplication {
       var sError = eSection ? eSection.getAttribute("error") : "";
       if(sError === "1") {
          let sError = eSection.textContent;
-         const iError = sError.indexOf("%%");   // search for %%, if found this is a special error
+         const iError = sError.indexOf("%%");               // search for %%, if found this is a special error
          if(iError !== -1) {
-            const iErrorTo = sError.indexOf("%%", iError + 2 );
-            if(iErrorTo !== -1 && iErrorTo - iError < 40 ) { // found start and end of error name ?
-               sError = sError.substring(iError, iErrorTo);
+            let sName = sError.substr( iError, 100 );
+            const iErrorTo = sName.indexOf("%%", 2);
+            if(iErrorTo !== -1  ) {                         // found start and end of error name ?
+               sName = sName.substr(0, iErrorTo);
             }
+            throw sName;
          }
          throw sError;
       }

@@ -208,7 +208,7 @@ export class CPageSuper {
                   else oTD.external.ready = false;
                   (<any>window).app.page.IsReadyToVote( true ); // Update vote button
 
-                  if( bError === false && oTD.external.comment === true ) { // if cocmment is allowed then display comment element for vote
+                  if( bError === false && oTD.external.comment === true ) { // if comment is allowed then display comment element for vote
                      const iRow = <number>v[1][0];
                      const eTR = <HTMLElement>oTT.ELEMENTGetRow( iRow );
                      let eComment = <HTMLElement>eTR.querySelector(".answer-comment");
@@ -319,7 +319,9 @@ export class CPageState {
       let a: CTableData[] = [];      
       let i = this.m_aTableData.length;
       while( --i >= 0 ) {
-         if( typeof iKey === "number" && this.m_aTableData[i][0] === iKey ) { a.push( this.m_aTableData[i][1] ); break; }
+         if( typeof iKey === "number" ) {
+            if( this.m_aTableData[i][0] === iKey ) { a.push( this.m_aTableData[i][1] ); break; }
+         }
          else a.push( this.m_aTableData[i][1] );
       }
       return a;

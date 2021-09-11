@@ -416,13 +416,18 @@ export class CUITableText {
         }
         const iDataRow = this._row_in_data(iRow), iDataColumn = this._column_in_data(iColumn); // index for row and column in CTableData, its physical position
         const oColumn = this.data.COLUMNGet(iDataColumn, undefined, true);
+        let get_value_stack = () => {
+            if (oTriggerData.edit)
+                return oTriggerData.edit.GetValueStack();
+            return [[iRow, iColumn], null, value, null];
+        };
         if (oTriggerData) {
             oTriggerData.column = oColumn;
             oTriggerData.data = this.data;
             oTriggerData.dataUI = this;
         }
         if (oTrigger) {
-            bOk = oTrigger.Trigger(65545 /* BeforeValidateValue */, oTriggerData, oTriggerData.edit.GetValueStack());
+            bOk = oTrigger.Trigger(65545 /* BeforeValidateValue */, oTriggerData, get_value_stack());
             if (bOk === false)
                 return;
         }
@@ -436,7 +441,7 @@ export class CUITableText {
             if (this.m_aValueError.length > 0)
                 this.RemoveCellError(iRow, iColumn); // remove error for this value if it was set before
             if (oTrigger) {
-                bOk = oTrigger.Trigger(65546 /* BeforeSetValue */, oTriggerData, oTriggerData.edit.GetValueStack());
+                bOk = oTrigger.Trigger(65546 /* BeforeSetValue */, oTriggerData, get_value_stack());
             }
             if (bOk !== false) {
                 if (this.is_state(4 /* SetHistory */))
@@ -448,7 +453,7 @@ export class CUITableText {
                     this.data.DIRTYSet(iDataRow); // Set row as dirty
             }
             if (oTrigger) {
-                bOk = oTrigger.Trigger(131083 /* AfterSetValue */, oTriggerData, oTriggerData.edit.GetValueStack());
+                bOk = oTrigger.Trigger(131083 /* AfterSetValue */, oTriggerData, get_value_stack());
             }
         }
         else {
