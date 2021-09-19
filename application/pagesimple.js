@@ -22,10 +22,15 @@ poll_question_list
 | **SetActivePoll** | Calling this method triggers a chain of operations that will display needed information about active poll |
 | OpenMessage | Show message to user |
 | **ProcessResponse** | Process responses from server |
+| **CallbackVote** | Handle vote logic |
 | QUERYGetPollOverview | Get information about selected poll. query = `poll_overview`. |
+| RESULTCreateQuestionPanel | Create panels for each question that belongs to current selected poll. query = `poll_question_list`. |
 | QUERYGetPollAllAnswers | Get all answers for poll. query = `poll_answer_all`. |
+| QUERYGetPollFilterCount | Get poll result (votes are counted), conditions for filter result is also added here |
 | RESULTCreatePollOverview | Process result from  `poll_overview` that has information about active poll|
 | RESULTCreateVote | Process all answers from questions in poll o avoid to many requests to server  `poll_answer_all`|
+| RESULTCreatePollFilterCount | Create table with poll vote count for each answer |
+| TRANSLATEPage | Translate page elements |
 
  
  */
@@ -213,6 +218,8 @@ export class CPageSimple extends CPageSuper {
             this.page_state.Reset(); // reset state (set queries to be sent and removes conditions)
             if (this.page_state.IsIsolated() === false) {
                 this.page_state = null;
+                if (this.poll.ip_count > 0)
+                    this.QUERYGetPollFilterCount(this.GetActivePoll());
             }
             else {
                 this.page_state = null;
@@ -425,6 +432,9 @@ export class CPageSimple extends CPageSuper {
                             //this.RESULTCreateSearch("idPollSearch", oResult);
                         }
                     }
+                    else if (sQueryName === "poll_answer_filtercount") {
+                        this.RESULTCreatePollFilterCount(document.getElementById("idPollQuestion"), oResult);
+                    }
                     /*
                                 else if(sQueryName === "poll_links") {
                                    this.RESULTCreatePollOverviewLinks("idPollOverview", oResult);
@@ -458,8 +468,8 @@ export class CPageSimple extends CPageSuper {
                         this.OpenMessage(this.GetLabel("vote_registered"));
                         if (this.poll.vote > 0) {
                             this.m_aVoteHistory.push(this.poll.vote);
-                            this.HISTORYSerialize(true);
-                            //this.QUERYGetPollFilterCount( this.GetActivePoll() );
+                            //this.HISTORYSerialize( true );
+                            this.QUERYGetPollFilterCount(this.GetActivePoll());
                         }
                         this.poll.vote = -1;
                     }
@@ -516,6 +526,30 @@ export class CPageSimple extends CPageSuper {
             sHint = "list";
         }
         request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", json: request.GetJson(oCommand), hint: sHint }, sXml);
+    }
+    QUERYGetPollFilterCount(_1) {
+        let request = this.app.request;
+        const sQuery = "poll_answer_filtercount";
+        let aCondition;
+        let oCommand = { command: "add_condition_to_query get_result", query: sQuery, set: this.queries_set, count: 100, format: 1, start: 0 };
+        if (typeof _1 === "number") { // if number that means that a new poll is selected, delete all conditions
+            aCondition = [{ table: "TPoll1", id: "PollK", value: _1 }];
+            oCommand.delete = 1;
+        }
+        else {
+            if (typeof _1.answer === "number") {
+                aCondition = [{ table: "TPollVote1", id: "TieFilterAnswer", value: _1.answer }];
+                oCommand.command = "add_condition_to_query get_query_conditions get_result";
+            }
+            else if (typeof _1.condition === "string") {
+                oCommand.command = "delete_condition_from_query get_query_conditions get_result";
+                oCommand.uuid = _1.condition;
+            }
+        }
+        let oQuery = new CQuery({ conditions: aCondition });
+        let sXml = oQuery.CONDITIONGetXml();
+        //this.m_bFilterConditionCount = false;
+        request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", hint: sQuery, json: request.GetJson(oCommand) }, sXml);
     }
     /**
      * result for selected poll
@@ -595,7 +629,7 @@ export class CPageSimple extends CPageSuper {
         }
         // ## Generate vote button
         let eVote = document.getElementById("idPollSendVote");
-        if (iIpCount > 0) {
+        if (iIpCount === 0) {
             eVote.innerHTML = "<a class='button-super vote-send' style='' disabled>" + this.GetLabel("vote") + "</a>";
             eVote.classList.add("is-active");
             let eButtonVote = eVote.firstElementChild;
@@ -719,6 +753,8 @@ export class CPageSimple extends CPageSuper {
         let eSection = eRoot.querySelector(`div[data-question="${iQuestion}"]`);
         let eArticle = eSection.querySelector("article");
         eSection.addEventListener("click", oEvent => {
+            if (this.poll.ip_count !== 0)
+                return false; // if ip is found then skip voting
             let e = oEvent.target;
             if (e.tagName !== "A")
                 e = e.parentElement;
@@ -852,6 +888,108 @@ export class CPageSimple extends CPageSuper {
         else {
             ePollList.classList.add("element-hide");
         }
+    }
+    /**
+     * Generate table that lists all how many votes each answer has based on selected vote and filter
+     * @param {string | HTMLElement} eRoot container element
+     * @param {any} oResult result data
+     */
+    RESULTCreatePollFilterCount(eRoot, oResult) {
+        if (typeof eRoot === "string")
+            eRoot = document.getElementById(eRoot);
+        let oTD = new CTableData({ id: oResult.id, name: oResult.name });
+        CPageSuper.ReadColumnInformationFromHeader(oTD, oResult.table.header);
+        oTD.ReadArray(oResult.table.body, { begin: 0 });
+        // ## Calculate largets vote count value
+        let iMaxCount = 0;
+        for (let i = 0, iTo = oTD.ROWGetCount(); i < iTo; i++) {
+            const iCount = oTD.CELLGetValue(i, "Count");
+            if (iMaxCount < iCount)
+                iMaxCount = iCount;
+        }
+        for (let i = 0, iTo = oTD.ROWGetCount(); i < iTo; i++) {
+            const iAnswer = oTD.CELLGetValue(i, "ID_Answer");
+            let eBar = eRoot.querySelector(`[data-answer="${iAnswer}"]`);
+            console.assert(eBar !== null, "failed to get bar section");
+            eBar = eBar.querySelector(`[data-type="bar"]`);
+            eBar.style.display = "block";
+            const iCount = oTD.CELLGetValue(i, "Count");
+            let eDrawBar = eBar.querySelector(".bar-draw");
+            const dDecimal = Math.round((iCount / iMaxCount) * 10000.0) / 100.0;
+            const sPercent = dDecimal.toString() + "%";
+            eDrawBar.style.width = sPercent;
+            eDrawBar.querySelector("span").innerText = sPercent + " (" + iCount + " röster)";
+        }
+        /*
+         oTD.COLUMNSetPropertyValue("PollQuestionK", "position.hide", true)
+   
+         const aHeaderText = this.GetLabel("filter_headers").split("|");
+         oTD.COLUMNSetPropertyValue("PollVoteK", "position.hide", false);
+         oTD.COLUMNSetPropertyValue("Question", "alias", aHeaderText[0]);
+         oTD.COLUMNSetPropertyValue("Answer", "alias", aHeaderText[1]);
+         oTD.COLUMNSetPropertyValue("PollVoteK", "alias", aHeaderText[2]);
+         oTD.COLUMNSetType( "PollVoteK", "number" );
+   
+         if( this.m_bFilterConditionCount === true ) this.m_oD3Bar.ResetFilterCount();
+   
+         // Update bar chart with values from filter
+         for( let i = 0, iTo = oTD.ROWGetCount(); i < iTo; i++ ) {
+            let a: [number,number] = [undefined, undefined];
+            if( this.m_bFilterConditionCount === true ) {
+               //a[1] = Math.floor(Math.random() * 25);
+               a[1] = <number>oTD.CELLGetValue(i,"Count");
+            }
+            else {
+               a[0] = <number>oTD.CELLGetValue(i,"Count");
+            }
+            this.m_oD3Bar.SetAnswerCount(
+               <number>oTD.CELLGetValue(i,"PollQuestionK"),
+               <string>oTD.CELLGetValue(i,"Answer"),
+               a
+            );
+         }
+   
+   
+         let eResult = <HTMLElement>eRoot.querySelector('[data-section="result_vote_count"]');
+         eResult.innerHTML = "";
+   
+         let oStyle = {
+            html_group: "table.table",                // "table" element and class table
+            html_row: "tr",                           // "tr" element for each row
+            html_cell_header: "th",                   // "th" for column headers
+            html_cell: "td",                          // "td" for cells
+            html_section_header: "thead",             // "thead" for header section
+            html_section_body: "tbody",               // "tbody" for body section
+         }
+   
+         let options = {
+            parent: eResult,                          // container
+            section: [ "table.header", "table.body" ],// sections to create
+            table: oTD,                               // source data
+            style: oStyle,                            // styling
+         };
+   
+         let oTT = new CUITableText(options);
+         oTD.UIAppend(oTT);
+   
+         oTT.COLUMNSetRenderer(0, (e, v, a) => {
+            const iRow: number = a[0][0];
+            if(iRow > 0) {
+               //check if value is same as value in previous row
+               const sRowBefore = <string>oTT.GetBodyValue( iRow - 1, 0 );
+               if( sRowBefore === <string>v ) return;
+   
+            }
+            let eB = document.createElement("b");
+            eB.innerText = <string>v;
+            (<HTMLElement>e).appendChild( eB );
+         });
+   
+   
+         oTT.Render();
+         this.m_oD3Bar.Render( this.m_bFilterConditionCount );
+         //eResult.style.display = "block";                     // show result
+         */
     }
     /**
      * Translate pager text

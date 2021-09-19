@@ -1899,7 +1899,9 @@ export class CUITableText {
             iLevelIndex++;
         }
         oRowRows.SetRowElement(iLevelIndex, aRowMain[1]); // main row
-        set_row_attr(aRowMain[1], aRowLevel[iLevelIndex], oRowRows.GetRowColumns(iLevelIndex), _HtmlCell, _HtmlValue, sStyle);
+        if (!_HtmlRowComplete) { // If no complete row then render all columns, complete row will need toe external code to manage columns
+            set_row_attr(aRowMain[1], aRowLevel[iLevelIndex], oRowRows.GetRowColumns(iLevelIndex), _HtmlCell, _HtmlValue, sStyle);
+        }
         aRowMain[1].dataset.i = iLevelIndex.toString();
         iLevelIndex++;
         if (aRowLevel[iLevelIndex] > 0) { // rows after main row
