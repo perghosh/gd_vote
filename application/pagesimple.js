@@ -900,12 +900,32 @@ export class CPageSimple extends CPageSuper {
         let oTD = new CTableData({ id: oResult.id, name: oResult.name });
         CPageSuper.ReadColumnInformationFromHeader(oTD, oResult.table.header);
         oTD.ReadArray(oResult.table.body, { begin: 0 });
+        // ## method used to update and/or return total votes for question
+        let update_count = (iQuestionK, iCount) => {
+            let a = null;
+            for (let i = 0, iTo = aVoteCount.length; i < iTo; i++) {
+                a = aVoteCount[i];
+                if (a[0] === iQuestionK)
+                    break;
+                a = null;
+            }
+            if (typeof iCount === "number") {
+                if (a === null)
+                    aVoteCount.push([iQuestionK, iCount]);
+                else {
+                    a[1] += iCount;
+                }
+                a = aVoteCount[aVoteCount.length - 1];
+            }
+            return a;
+        };
         // ## Calculate largets vote count value
         let iMaxCount = 0;
+        let aVoteCount = [];
         for (let i = 0, iTo = oTD.ROWGetCount(); i < iTo; i++) {
+            const iQuestion = oTD.CELLGetValue(i, "PollQuestionK");
             const iCount = oTD.CELLGetValue(i, "Count");
-            if (iMaxCount < iCount)
-                iMaxCount = iCount;
+            update_count(iQuestion, iCount);
         }
         for (let i = 0, iTo = oTD.ROWGetCount(); i < iTo; i++) {
             const iAnswer = oTD.CELLGetValue(i, "ID_Answer");
@@ -913,7 +933,9 @@ export class CPageSimple extends CPageSuper {
             console.assert(eBar !== null, "failed to get bar section");
             eBar = eBar.querySelector(`[data-type="bar"]`);
             eBar.style.display = "block";
+            const iQuestion = oTD.CELLGetValue(i, "PollQuestionK");
             const iCount = oTD.CELLGetValue(i, "Count");
+            const iMaxCount = update_count(iQuestion)[1];
             let eDrawBar = eBar.querySelector(".bar-draw");
             const dDecimal = Math.round((iCount / iMaxCount) * 10000.0) / 100.0;
             const sPercent = dDecimal.toString() + "%";

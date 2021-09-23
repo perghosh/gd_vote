@@ -1050,11 +1050,35 @@ export class CPageSimple extends CPageSuper {
       CPageSuper.ReadColumnInformationFromHeader(oTD, oResult.table.header);
       oTD.ReadArray(oResult.table.body, { begin: 0 });
 
+      // ## method used to update and/or return total votes for question
+      let update_count = (iQuestionK: number, iCount?: number) => {
+         let a: [number,number] = null;
+         for( let i = 0, iTo = aVoteCount.length; i < iTo; i++ ) {
+            a = aVoteCount[i];
+            if( a[0] === iQuestionK ) break;
+            a = null;
+         }
+
+         if( typeof iCount === "number") {
+            if( a === null ) aVoteCount.push( [iQuestionK, iCount] );
+            else {
+               a[1] += iCount;
+            }
+
+            a = aVoteCount[ aVoteCount.length - 1 ];
+         }
+
+         return a;
+      };
+
       // ## Calculate largets vote count value
       let iMaxCount: number = 0;
+      let aVoteCount: [number,number][] = [];
       for( let i = 0, iTo = oTD.ROWGetCount(); i < iTo; i++ ) {
+
+         const iQuestion = <number>oTD.CELLGetValue(i, "PollQuestionK");
          const iCount = <number>oTD.CELLGetValue(i, "Count");
-         if( iMaxCount < iCount ) iMaxCount = iCount;
+         update_count( iQuestion, iCount );
       }
 
       for( let i = 0, iTo = oTD.ROWGetCount(); i < iTo; i++ ) {
@@ -1063,7 +1087,9 @@ export class CPageSimple extends CPageSuper {
          eBar = <HTMLElement>eBar.querySelector(`[data-type="bar"]`);
          eBar.style.display = "block";
 
+         const iQuestion = <number>oTD.CELLGetValue(i, "PollQuestionK");
          const iCount = <number>oTD.CELLGetValue(i, "Count");
+         const iMaxCount = update_count( iQuestion )[1];
          let eDrawBar = <HTMLElement>eBar.querySelector(".bar-draw");
          const dDecimal = Math.round((iCount / iMaxCount) * 10000.0) / 100.0;
          const sPercent = dDecimal.toString() + "%";
