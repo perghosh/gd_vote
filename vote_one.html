@@ -2,22 +2,23 @@
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
 <body>
 
-   <!--
-
-   <label class="vote-check" data-style="rounded" data-color="green">
-      <input checked type="checkbox" value="1">
-      <span class="toggle">
-         <span class="switch"></span>
-      </span>
-   </label>
-   -->
+<!--
+   ## url parameters
+   | Name | Description |
+   |-|-| 
+   |debug|print information for debug|
+   |latest|get latest poll|
+   |poll|selected poll key to open|
+   |||
+   |||
+-->
 
 <!-- 
    https://versions.bulma.io/0.7.0/documentation/components/tabs/
    hamburger: https://bulma.dev/classes/navbar/navbar-burger
    https://www.geeksforgeeks.org/bulma-tabs/
 -->
-
+   <div id="idBanner"></div>
    <div id="idPage" class="container" style="border:  3px solid #3aaa35; border-radius:  1em; padding: 1em;">
       <div style="position: absolute; top: 1em; right: 1em; opacity: 0.1; max-width: 150px;">
          <img src="res/icon_medium.jpg" alt="logo">
@@ -153,8 +154,26 @@ JS: SetActiveState is used to switch state in page
                }
             }
 
+            const sLanguage = oParams.get("language");      // language parameter
+            if( sLanguage ) {
+               if( sLanguage == "1" ) window.app.request.Load(`translate.json`, "application/json", "set-language");
+               else window.app.request.Load(`translate_${sLanguage}.json`, "application/json", "set-language");
+            }
 
-            if(oParams.has("poll") === false) {
+            const sGroup = oParams.get("group");            // if group then set group to search query and hashtag query
+            if( sGroup === "1" ) this.state.set_poll_group = true;
+            else if( typeof sGroup === "string" && sGroup.length ) {
+               this.state.poll_group = parseInt( sGroup, 10 );
+               if( isNaN( this.state.poll_group ) ) throw "unable to read group number";
+            }
+
+            if(oParams.has("latest") === true) {
+               const iGroup = parseInt( oParams.get("latest"), 10 ); // if number then this is group key
+               if( isNaN(iGroup) === false ) this.state.poll_group = iGroup;
+               this.GetLatestPoll();
+               return;
+            }
+            else if(oParams.has("poll") === false) {
                this.OpenMessage("Saknar id till aktiv fråga");
                return;
             }
@@ -165,16 +184,8 @@ JS: SetActiveState is used to switch state in page
                return;
             }
 
-            const sGroup = oParams.get("group");            // if group then set group to search query and hashtag query
-            if( sGroup === "1" ) this.state.set_poll_group = true;
 
             this.SetActivePoll( iPoll );
-
-            const sLanguage = oParams.get("language");      // language parameter
-            if( sLanguage ) {
-               if( sLanguage == "1" ) window.app.request.Load(`translate.json`, "application/json", "set-language");
-               else window.app.request.Load(`translate_${sLanguage}.json`, "application/json", "set-language");
-            }
          }
          else if( sOperation === "insert-voter" ) {
             window.app.page.OpenMessage("Användaren är registrerad och kan rösta efter att ha loggat in igen!");
@@ -187,6 +198,9 @@ JS: SetActiveState is used to switch state in page
                const sAlias = window.app.alias;
                CPageOne.HISTORYSerializeSession( true, sSession, sAlias );
             }
+            CApplication.LoadScript("extension/banner.js", false, false, () => {
+               //alert("banner");
+            })
          }
          else if(sOperation === "select-poll") {
             // set arrow to down for open vote counts for questions
@@ -337,8 +351,6 @@ JS: SetActiveState is used to switch state in page
       import { CApplication } from "./application/application.js";
       import { CPageOne } from "./application/pageone.js";
       
-
-      //window.URLSearchParamsss = URLSearchParamsss;
 
       window.edit = edit;
       window.CTableData = CTableData;

@@ -155,8 +155,30 @@
                }
             }
 
+            const sLanguage = oParams.get("language");      // language parameter
+            if( sLanguage ) {
+               if( sLanguage == "1" ) window.app.request.Load(`translate.json`, "application/json", "set-language");
+               else window.app.request.Load(`translate_${sLanguage}.json`, "application/json", "set-language");
+            }
 
-            if(oParams.has("poll") === false) {
+            const sGroup = oParams.get("group");            // if group then set group to search query and hashtag query
+            if( sGroup === "1" ) this.state.set_poll_group = true;
+            else if( typeof sGroup === "string" && sGroup.length ) {
+               this.state.poll_group = parseInt( sGroup, 10 );
+               if( isNaN( this.state.poll_group ) ) throw "unable to read group number";
+            }
+
+            if(oParams.has("latest") === true) {
+               const iGroup = parseInt( oParams.get("latest"), 10 ); // if number then this is group key
+               if( isNaN(iGroup) === false ) {
+                  this.state.poll_group = iGroup;
+                  this.state.set_poll_group = true;
+               }
+               
+               this.GetLatestPoll();
+               return;
+            }
+            else if(oParams.has("poll") === false) {
                this.OpenMessage("Saknar id till aktiv fråga");
                return;
             }
@@ -167,16 +189,7 @@
                return;
             }
 
-            const sGroup = oParams.get("group");            // if group then set group to search query and hashtag query
-            if( sGroup === "1" ) this.state.set_poll_group = true;
-
             this.SetActivePoll( iPoll );
-
-            const sLanguage = oParams.get("language");      // language parameter
-            if( sLanguage ) {
-               if( sLanguage == "1" ) window.app.request.Load(`translate.json`, "application/json", "set-language");
-               else window.app.request.Load(`translate_${sLanguage}.json`, "application/json", "set-language");
-            }
          }
          else if(sOperation === "select-poll") {
          }

@@ -19,6 +19,7 @@ poll_question_list
 |:-|:-|
 | SendVote | Send vote to server to register vote for user |
 | **SetActiveState** | Set active state for page, use this when parts in head or body is changed |
+| **GetLatestPoll** | Get latest poll |
 | **SetActivePoll** | Calling this method triggers a chain of operations that will display needed information about active poll |
 | OpenMessage | Show message to user |
 | **ProcessResponse** | Process responses from server |
@@ -145,6 +146,10 @@ export class CPageSimple extends CPageSuper {
      * Return true if voter key is found
      */
     IsVoter() { return this.m_aVoter[0] !== -1; }
+    /**
+     * Get latest poll from server
+     */
+    GetLatestPoll() { this.QUERYGetLatestPoll(); }
     /**
      * Activate poll with number
      * @param iActivePoll key to active poll
@@ -418,7 +423,15 @@ export class CPageSimple extends CPageSuper {
                             return;
                         }
                     }
-                    if (sQueryName === "poll_overview") {
+                    if (sQueryName === "poll_latest") {
+                        const oTD = new CTableData({ id: oResult.id, name: oResult.name });
+                        CPageSuper.ReadColumnInformationFromHeader(oTD, oResult.table.header);
+                        oTD.ReadArray(oResult.table.body, { begin: 0 });
+                        if (oTD.ROWGetCount() !== 1)
+                            throw "Has to be exactly one row from poll_latest query";
+                        this.SetActivePoll(oTD.CELLGetValue(0, "PollK"));
+                    }
+                    else if (sQueryName === "poll_overview") {
                         this.RESULTCreatePollOverview("idPollOverview", oResult);
                     }
                     else if (sQueryName === "poll_answer_all") {
@@ -479,6 +492,27 @@ export class CPageSimple extends CPageSuper {
                 }
                 break;
         }
+    }
+    /**
+     * Query for latest poll
+     * @param {number} iGroup group number poll is connected to
+     */
+    QUERYGetLatestPoll(iGroup) {
+        iGroup = iGroup || this.state.poll_group;
+        let request = this.app.request;
+        let oCommand;
+        let sXml;
+        if (typeof iGroup === "number") {
+            const oQuery = new CQuery({
+                conditions: [{ table: "TPoll1", id: "PollGroupK-Id", value: iGroup, simple: iGroup.toString() }]
+            });
+            oCommand = { command: "add_condition_to_query get_result", delete: 1, query: "poll_latest", set: this.queries_set, count: 1, format: 1, start: 0 };
+            sXml = oQuery.CONDITIONGetXml();
+        }
+        else {
+            oCommand = { command: "get_result", delete: 1, query: "poll_latest", set: this.queries_set, count: 1, format: 1, start: 0 };
+        }
+        request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
     }
     /**
      * Get information about selected poll. query = poll_overview
@@ -610,8 +644,8 @@ export class CPageSimple extends CPageSuper {
         if (iQuestionCount > 0) {
             // ## Generate title for poll
             ePollOverview.querySelector(`[data-type="name"]`).textContent = sName || "";
-            ePollOverview.querySelector(`[data-type="description"]`).innerHTML = (sDescription ? marked(sDescription) : "");
-            ePollOverview.querySelector(`[data-type="article"]`).innerHTML = (sArticle ? marked(sArticle) : "");
+            ePollOverview.querySelector(`[data-type="description"]`).innerHTML = (sDescription ? marked.marked(sDescription) : "");
+            ePollOverview.querySelector(`[data-type="article"]`).innerHTML = (sArticle ? marked.marked(sArticle) : "");
         }
         // show or hide links
         let eLink = document.getElementById("idPollLink");

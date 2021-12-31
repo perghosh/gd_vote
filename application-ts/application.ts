@@ -166,4 +166,22 @@ export class CApplication {
          oApplication.CallOwner(sMethod, e);
       }
    }
+
+
+   /**
+    * Load javascript file
+    * @param {string}     sUrl url with script file to load
+    * @param {boolean}    bAsync if file is loaded asynchronously
+    * @param {boolean}    bDefer if file is loaded in parallel
+    * @param {string) => void)} callback tto be notified when file is loaded
+    */
+   static LoadScript( sUrl: string, bAsync: boolean, bDefer: boolean, call: ((sMessage: string) => void) ) {
+      const eScript = <HTMLScriptElement>document.createElement("script");
+      eScript.src = sUrl;
+      eScript.async = bAsync || false;
+      eScript.defer = bAsync || bDefer || false;
+      (document.head || document.documentElement).appendChild(eScript);
+
+      if( typeof call === "function" ) call( sUrl );
+   }
 } // class CApplication

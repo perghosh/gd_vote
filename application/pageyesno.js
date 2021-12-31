@@ -1151,7 +1151,11 @@ export class CPageYesNo extends CPageSuper {
         if (typeof eRoot === "string")
             eRoot = document.getElementById(eRoot);
         let oTD = new CTableData({ id: oResult.id, name: oResult.name });
-        CPageSuper.ReadColumnInformationFromHeader(oTD, oResult.table.header);
+        CPageSuper.ReadColumnInformationFromHeader(oTD, oResult.table.header, (iIndex, oColumn, oTD) => {
+            if (oColumn.alias === "ID_Answer") {
+                oTD.COLUMNSetPropertyValue(iIndex, "position.hide", true);
+            }
+        });
         oTD.ReadArray(oResult.table.body, { begin: 0 });
         oTD.COLUMNSetPropertyValue("PollQuestionK", "position.hide", true);
         const aHeaderText = this.GetLabel("filter_headers").split("|");

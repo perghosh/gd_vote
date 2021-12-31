@@ -11,9 +11,11 @@ pageone = page logic for managing one vote, user can not select any votes. activ
 |:-|:-|
 | SendVote | Send vote to server to register vote for user |
 | **SetActiveState** | Set active state for page, use this when parts in head or body is changed |
+| **GetLatestPoll** | Get latest poll |
 | **SetActivePoll** | Calling this method triggers a chain of operations that will display needed information about active poll |
 | OpenMessage | Show message to user |
 | **ProcessResponse** | Process responses from server |
+| QUERYGetLatestPoll | Get latest poll. query = `poll_latest`. |
 | QUERYGetPollOverview | Get information about selected poll. query = `poll_overview`. |
 | QUERYGetPollAllAnswers | Get all answers for poll. query = `poll_answer_all`. |
 | QUERYGetPollLinks | Get links for poll. Query used is `poll_links` |
@@ -22,13 +24,12 @@ pageone = page logic for managing one vote, user can not select any votes. activ
 | QUERYGetPollRelated | Get links for poll. Query used is `poll_overview_related` |
 | QUERYGetPollFilterCount | Get poll result (votes are counted), conditions for filter result is also added here |
 | QUERYSetPollGroupCondition | Set poll group in query used to select polls |
-| QUERYGetLatestPoll | Get latest poll |
 | QUERYSetPollGroupCondition | Set poll group for polls displayed in page |
 | RESULTCreateFindVoter | Result from finding voter, this is called if user tries to login |
 | RESULTCreatePollOverview | Process result from  `poll_overview` that has information about active poll|
 | RESULTCreateVote | Process all answers from questions in poll o avoid to many requests to server  `poll_answer_all`|
 | RESULTCreatePollOverviewLinks | Process result from `poll_links` and render these for user |
-| RESULTCreatePollOverviewVoteComments | Process result from `poll_vote_comment` that has comments from votes in poll |
+| RESULTCreatePollOverviewVoteComments | Proc ess result from `poll_vote_comment` that has comments from votes in poll |
 | RESULTCreatePollOverviewRelated | Process result from `poll_overview_related`, render related polls |
 | RESULTCreatePollFilterCount | Create table with poll vote count for each answer |
 | RESULTCreateQuestionPanel | Create panels for each question that belongs to current selected poll. Like containers for selectable votes |
@@ -152,6 +153,10 @@ export class CPageOne extends CPageSuper {
         console.assert(false, `No Question for ${iQuestion}`);
         return null;
     }
+    /**
+     * Get latest poll from server
+     */
+    GetLatestPoll() { this.QUERYGetLatestPoll(); }
     /**
      * Activate poll with number
      * @param iActivePoll key to active poll
@@ -451,7 +456,15 @@ export class CPageOne extends CPageSuper {
                             return;
                         }
                     }
-                    if (sQueryName === "poll_overview") {
+                    if (sQueryName === "poll_latest") {
+                        const oTD = new CTableData({ id: oResult.id, name: oResult.name });
+                        CPageSuper.ReadColumnInformationFromHeader(oTD, oResult.table.header);
+                        oTD.ReadArray(oResult.table.body, { begin: 0 });
+                        if (oTD.ROWGetCount() !== 1)
+                            throw "Has to be exactly one row from poll_latest query";
+                        this.SetActivePoll(oTD.CELLGetValue(0, "PollK"));
+                    }
+                    else if (sQueryName === "poll_overview") {
                         this.RESULTCreatePollOverview("idPollOverview", oResult);
                     }
                     else if (sQueryName === "poll_answer_all") {
@@ -515,6 +528,27 @@ export class CPageOne extends CPageSuper {
                 }
             }
         }
+    }
+    /**
+     * Query for latest poll
+     * @param {number} iGroup group number poll is connected to
+     */
+    QUERYGetLatestPoll(iGroup) {
+        iGroup = iGroup || this.state.poll_group;
+        let request = this.app.request;
+        let oCommand;
+        let sXml;
+        if (typeof iGroup === "number") {
+            const oQuery = new CQuery({
+                conditions: [{ table: "TPoll1", id: "PollGroupK-Id", value: iGroup, simple: iGroup.toString() }]
+            });
+            oCommand = { command: "add_condition_to_query get_result", delete: 1, query: "poll_latest", set: this.queries_set, count: 1, format: 1, start: 0 };
+            sXml = oQuery.CONDITIONGetXml();
+        }
+        else {
+            oCommand = { command: "get_result", delete: 1, query: "poll_latest", set: this.queries_set, count: 1, format: 1, start: 0 };
+        }
+        request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
     }
     /**
      * Get information about selected poll. query = poll_overview
@@ -677,8 +711,6 @@ export class CPageOne extends CPageSuper {
         let oCommand = { command: "delete_condition_from_query add_condition_to_query", query: "poll_search", set: this.queries_set, post: 1 };
         request.Get("SCRIPT_Run", { file: "/PAGE_result.lua", json: request.GetJson(oCommand) }, sXml);
     }
-    QUERYGetLatestPoll(iGroup) {
-    }
     /**
      * result for selected poll
      * If data is found then get questions for poll
@@ -701,7 +733,7 @@ export class CPageOne extends CPageSuper {
             //eRoot.style.display = "block";
             document.getElementById("idContent").style.display = "block";
         }
-        let oTD = new CTableData({ id: oResult.id, name: oResult.name });
+        const oTD = new CTableData({ id: oResult.id, name: oResult.name });
         CPageSuper.ReadColumnInformationFromHeader(oTD, oResult.table.header);
         oTD.ReadArray(oResult.table.body, { begin: 0 });
         const sName = oTD.CELLGetValue(0, 1); // Poll name
@@ -746,7 +778,8 @@ export class CPageOne extends CPageSuper {
             if (eArticle) {
                 if (sArticle) {
                     eArticle.style.display = "block";
-                    eArticle.innerHTML = marked(sArticle);
+                    let m = marked.marked || marked;
+                    eArticle.innerHTML = m(sArticle);
                     if (eDescription)
                         eDescription.style.display = "none";
                 }
@@ -899,6 +932,8 @@ export class CPageOne extends CPageSuper {
     RESULTCreateVote(eRoot, oResult) {
         if (typeof eRoot === "string")
             eRoot = document.getElementById(eRoot);
+        if (oResult.count === 0)
+            return;
         let oResultAnswer = JSON.parse(JSON.stringify(oResult)); // clone result
         this.m_aQuestion.forEach(oQuestion => {
             let aTable = oResult.table.body.filter(a => {
@@ -1045,7 +1080,8 @@ export class CPageOne extends CPageSuper {
 </div>
 <div data-comment></div>`;
             //eCell.querySelector("[data-answer]").textContent = sAnswer;
-            eCell.querySelector("[data-comment]").innerHTML = marked(value);
+            let m = marked.marked || marked;
+            eCell.querySelector("[data-comment]").innerHTML = m(value);
         });
         /*
                  `<div class="has-text-grey is-pulled-right" style="displayfont-size: 80%;">
@@ -1152,6 +1188,7 @@ export class CPageOne extends CPageSuper {
         CPageSuper.ReadColumnInformationFromHeader(oTD, oResult.table.header);
         oTD.ReadArray(oResult.table.body, { begin: 0 });
         oTD.COLUMNSetPropertyValue("PollQuestionK", "position.hide", true);
+        oTD.COLUMNSetPropertyValue("ID_Answer", "position.hide", true);
         const aHeaderText = this.GetLabel("filter_headers").split("|");
         oTD.COLUMNSetPropertyValue("PollVoteK", "position.hide", false);
         oTD.COLUMNSetPropertyValue("Question", "alias", aHeaderText[0]);
